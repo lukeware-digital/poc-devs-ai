@@ -84,6 +84,30 @@ services:
     depends_on:
       - ollama
 
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./chroma_data:/app/chroma_data
+      - ./logs:/app/logs
+    environment:
+      - CHROMA_DB_HOST=chromadb
+      - CHROMA_DB_PORT=8000
+      - POSTGRES_DB=minha_base
+      - POSTGRES_USER=usuario
+      - POSTGRES_PASSWORD=senha
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis-stack
+      - REDIS_PORT=6379
+    networks:
+      - db_net
+    depends_on:
+      - chromadb
+      - postgres
+      - redis-stack
+    restart: unless-stopped
+
 volumes:
   open-webui-data:
   ollama_data:

@@ -1,40 +1,28 @@
-version: '3.8'
-
 services:
-  redis:
-    image: redis:alpine
-    container_name: my_redis
+  redis-stack:
+    image: redis/redis-stack:latest
+    restart: unless-stopped
     ports:
+      - "8001:8001"
       - "6379:6379"
     networks:
-      - db_network
-
-  redisinsight:  # <- Este é o NOVO serviço
-    image: redis/redisinsight:latest
-    container_name: my_redisinsight
-    ports:
-      - "8001:8001"  # A porta do RedisInsight é diferente da do Redis
-    volumes:
-      - redisinsight_data:/data
-    networks:
-      - db_network
-
+      - db_net
   chromadb:
     image: chromadb/chroma:0.6.3
-    container_name: my_chromadb
+    restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
-      - IS_PERSISTENT=TRUE
-      - ANONYMIZED_TELEMETRY=FALSE
+      - IS_PERSISTENT=true
+      - ANONYMIZED_TELEMETRY=false
     volumes:
       - ./chroma_data:/chroma/chroma
     networks:
-      - db_network
+      - db_net
 
   postgres:
     image: postgres:alpine
-    container_name: my_postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: minha_base
       POSTGRES_USER: usuario
@@ -44,13 +32,24 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - db_network
+      - db_net
+
+  postgres-web:
+    image: sosedoff/pgweb:latest
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - DATABASE_URL=postgresql://usuario:senha@postgres:5432/minha_base?sslmode=disable
+    networks:
+      - db_net
+    depends_on:
+      - postgres
 
 volumes:
   postgres_data:
-  redisinsight_data:  # <- Volume para persistir as configurações do RedisInsight
+  redisinsight_data:
 
 networks:
-  db_network:
-    name: db_network
-    external: true
+  db_net:
+    name: db_net

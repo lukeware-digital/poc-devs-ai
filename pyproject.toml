@@ -1,0 +1,46 @@
+[tool.ruff]
+# Excluir diretórios
+exclude = [
+    ".git",
+    ".venv",
+    "build",
+    "dist",
+    "__pycache__"
+]
+
+# Configuração de formatação
+line-length = 120
+indent-width = 4
+
+# Configurações de lint
+[tool.ruff.lint]
+# Selecionar regras de lint (padrão + estendendo se necessário)
+select = [
+    "E",    # Erros do pycodestyle
+    "W",    # Avisos do pycodestyle
+    "F",    # Erros do pyflakes
+    "I",    # Import sorting (isort)
+    "C",    # Comentários e docstrings
+    "B",    # Erros do flake8-bugbear
+    "UP",   # Modernizações do Python
+]
+
+# Ignorar regras específicas
+ignore = [
+    "B904",  # raise ... from
+    "F821",  # Nome não definido
+]
+# Permitir correção automática
+fixable = ["ALL"]
+unfixable = []
+
+# Ordem de imports
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-wrap-aliases = true
+known-first-party = ["your_package_name"]
+
+# Configurações de formatação
+[tool.ruff.format]
+# Pode incluir opções de formatação aqui, se futuramente suportar mais
+# Por enquanto, ruff format é equivalente ao black

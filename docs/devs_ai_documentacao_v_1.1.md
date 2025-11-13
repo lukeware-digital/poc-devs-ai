@@ -152,7 +152,7 @@ Todos os dados trafegados pelo sistema passam por modelos definidos em Pydantic,
 ### Exemplo de Schema com Mecanismo de Fallback
 ```python
 from pydantic import BaseModel, field_validator, model_validator
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, any
 
 class TaskSpecification(BaseModel):
     task_id: str
@@ -251,7 +251,7 @@ class SharedContext:
             'last_successful_agent': None
         }
     
-    def update_decision(self, agent_id: str, decision_type: str, key: str, value: Any, confidence: float):
+    def update_decision(self, agent_id: str, decision_type: str, key: str, value: any, confidence: float):
         """Atualiza uma decisão com metadados completos"""
         decision_record = {
             'value': value,

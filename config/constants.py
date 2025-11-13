@@ -10,14 +10,14 @@ DEFAULT_REPEAT_PENALTY = 1.1
 
 # Temperaturas específicas por agente
 AGENT_TEMPERATURES = {
-    'agent1': 0.3,  # Clarificador - preciso
-    'agent2': 0.8,  # Product Manager - criativo
-    'agent3': 0.2,  # Arquiteto - muito preciso
-    'agent4': 0.3,  # Tech Lead - preciso
-    'agent5': 0.2,  # Scaffolder - muito preciso
-    'agent6': 0.3,  # Desenvolvedor - preciso
-    'agent7': 0.1,  # Code Reviewer - extremamente preciso
-    'agent8': 0.4,  # Finalizador - moderadamente criativo
+    "agent1": 0.3,  # Clarificador - preciso
+    "agent2": 0.8,  # Product Manager - criativo
+    "agent3": 0.2,  # Arquiteto - muito preciso
+    "agent4": 0.3,  # Tech Lead - preciso
+    "agent5": 0.2,  # Scaffolder - muito preciso
+    "agent6": 0.3,  # Desenvolvedor - preciso
+    "agent7": 0.1,  # Code Reviewer - extremamente preciso
+    "agent8": 0.4,  # Finalizador - moderadamente criativo
 }
 
 # === CONFIGURAÇÕES DE CACHE ===
@@ -35,14 +35,14 @@ MAX_RETRY_DELAY = 30  # segundos
 
 # Retries específicas por agente
 AGENT_MAX_RETRIES = {
-    'agent1': 2,
-    'agent2': 3,
-    'agent3': 2,
-    'agent4': 2,
-    'agent5': 3,
-    'agent6': 2,
-    'agent7': 1,
-    'agent8': 2,
+    "agent1": 2,
+    "agent2": 3,
+    "agent3": 2,
+    "agent4": 2,
+    "agent5": 3,
+    "agent6": 2,
+    "agent7": 1,
+    "agent8": 2,
 }
 
 # === CONFIGURAÇÕES DE CAPABILITY TOKENS ===
@@ -149,56 +149,86 @@ FALLBACK_CONFIDENCE_THRESHOLD = 0.5
 
 # === FORMATOS E CONSTANTES DE VALIDAÇÃO ===
 VALID_PROGRAMMING_LANGUAGES = [
-    'python', 'javascript', 'typescript', 'java', 'cpp', 'c',
-    'csharp', 'go', 'rust', 'ruby', 'php', 'swift', 'kotlin'
+    "python",
+    "javascript",
+    "typescript",
+    "java",
+    "cpp",
+    "c",
+    "csharp",
+    "go",
+    "rust",
+    "ruby",
+    "php",
+    "swift",
+    "kotlin",
 ]
 
-VALID_DOC_TYPES = ['code', 'architecture', 'requirement', 'commit', 'generic']
+VALID_DOC_TYPES = ["code", "architecture", "requirement", "commit", "generic"]
 
 COMPLEXITY_MIN = 1
 COMPLEXITY_MAX = 10
 
 # === MENSAGENS DE STATUS ===
-STATUS_SUCCESS = 'success'
-STATUS_FAILURE = 'failure'
-STATUS_FALLBACK_APPLIED = 'success_with_fallback'
-STATUS_PENDING = 'pending'
-STATUS_IN_PROGRESS = 'in_progress'
-STATUS_COMPLETED = 'completed'
-STATUS_CANCELLED = 'cancelled'
+STATUS_SUCCESS = "success"
+STATUS_FAILURE = "failure"
+STATUS_FALLBACK_APPLIED = "success_with_fallback"
+STATUS_PENDING = "pending"
+STATUS_IN_PROGRESS = "in_progress"
+STATUS_COMPLETED = "completed"
+STATUS_CANCELLED = "cancelled"
 
 # === TIPOS DE OPERAÇÕES ===
-OPERATION_DEFAULT = 'default'
-OPERATION_REQUIREMENTS_ANALYSIS = 'requirements_analysis'
-OPERATION_USER_STORIES_CREATION = 'user_stories_creation'
-OPERATION_ARCHITECTURE_DEFINITION = 'architecture_definition'
-OPERATION_TECHNICAL_PLANNING = 'technical_planning'
-OPERATION_PROJECT_SCAFFOLDING = 'project_scaffolding'
-OPERATION_CODE_IMPLEMENTATION = 'code_implementation'
-OPERATION_CODE_REVIEW = 'code_review'
-OPERATION_FINAL_DELIVERY = 'final_delivery'
+OPERATION_DEFAULT = "default"
+OPERATION_REQUIREMENTS_ANALYSIS = "requirements_analysis"
+OPERATION_USER_STORIES_CREATION = "user_stories_creation"
+OPERATION_ARCHITECTURE_DEFINITION = "architecture_definition"
+OPERATION_TECHNICAL_PLANNING = "technical_planning"
+OPERATION_PROJECT_SCAFFOLDING = "project_scaffolding"
+OPERATION_CODE_IMPLEMENTATION = "code_implementation"
+OPERATION_CODE_REVIEW = "code_review"
+OPERATION_FINAL_DELIVERY = "final_delivery"
 
 # === OPERAÇÕES CRÍTICAS (requerem capability tokens) ===
 CRITICAL_OPERATIONS = [
-    'git_push',
-    'file_deletion',
-    'database_modification',
-    'system_command',
-    'network_request',
-    'file_execution',
-    'environment_modification',
-    'sudo_operation'
+    "git_push",
+    "file_deletion",
+    "database_modification",
+    "system_command",
+    "network_request",
+    "file_execution",
+    "environment_modification",
+    "sudo_operation",
 ]
 
 # === COMANDOS PERMITIDOS (whitelist) ===
 ALLOWED_SYSTEM_COMMANDS = [
-    'ls', 'pwd', 'cat', 'echo', 'mkdir', 'touch', 'cp', 'mv', 'grep', 'find'
+    "ls",
+    "pwd",
+    "cat",
+    "echo",
+    "mkdir",
+    "touch",
+    "cp",
+    "mv",
+    "grep",
+    "find",
 ]
 
 # === PADRÕES DE ARQUIVOS PROTEGIDOS ===
 PROTECTED_FILE_PATTERNS = [
-    '*.pyc', '*.pyo', '__pycache__/*', '.git/*', '.env',
-    'config/*', 'secrets/*', 'credentials/*', '*password*',
-    '*secret*', '*key*', '*token*', '*.key', '*.pem'
+    "*.pyc",
+    "*.pyo",
+    "__pycache__/*",
+    ".git/*",
+    ".env",
+    "config/*",
+    "secrets/*",
+    "credentials/*",
+    "*password*",
+    "*secret*",
+    "*key*",
+    "*token*",
+    "*.key",
+    "*.pem",
 ]
-

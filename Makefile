@@ -1,3 +1,11 @@
+.PHONY: format lint up-redis up-chroma pull-ollama
+
+format:
+	@ruff format .
+
+lint:
+	@ruff check . --fix
+
 up-redis:
 	@docker run -d --name redis -p 6379:6379 redis
 

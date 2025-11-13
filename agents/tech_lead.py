@@ -1,7 +1,5 @@
 import json
 import logging
-from datetime import datetime
-from typing import Dict, Any
 
 from agents.base_agent import BaseAgent
 
@@ -10,18 +8,18 @@ logger = logging.getLogger("DEVs_AI")
 
 class Agent4_TechLead(BaseAgent):
     """Agent-4: Tech Lead - Define tasks técnicas e stack detalhada"""
-    
-    async def _execute_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        spec = task['specification']
-        architecture = task['architecture']
-        user_stories = task['user_stories']
-        
+
+    async def _execute_task(self, task: dict[str, any]) -> dict[str, any]:
+        spec = task["specification"]
+        architecture = task["architecture"]
+        user_stories = task["user_stories"]
+
         prompt = f"""
         Como Tech Lead, crie tasks técnicas detalhadas baseado em:
         ESPECIFICAÇÃO: {json.dumps(spec, indent=2)}
         ARQUITETURA: {json.dumps(architecture, indent=2)}
         HISTÓRIAS DE USUÁRIO: {json.dumps(user_stories, indent=2)}
-        
+
         Suas responsabilidades:
         1. Decompor histórias em tasks técnicas implementáveis
         2. Definir stack tecnológica específica (versões, bibliotecas)
@@ -29,7 +27,7 @@ class Agent4_TechLead(BaseAgent):
         4. Definir dependências entre tasks
         5. Especificar critérios de qualidade para cada task
         6. Identificar riscos técnicos e mitigações
-        
+
         Formato JSON:
         {{
             "technical_tasks": [
@@ -87,31 +85,32 @@ class Agent4_TechLead(BaseAgent):
             ]
         }}
         """
-        
+
         # Obtém temperatura do config para este agente
-        agent_config = getattr(self.shared_context, 'config', {})
-        temperature = agent_config.get('agents', {}).get('agent4', {}).get('temperature', 0.3)
-        
+        agent_config = getattr(self.shared_context, "config", {})
+        temperature = agent_config.get("agents", {}).get("agent4", {}).get("temperature", 0.3)
+
         response = await self.llm.generate_response(prompt, temperature=temperature)
-        
+
         try:
             technical_plan = json.loads(response)
-            
+
             # Atualiza contexto compartilhado
             await self.shared_context.update_decision(
-                self.agent_id, 'technical', 'technical_tasks', 
-                technical_plan, 0.9
+                self.agent_id, "technical", "technical_tasks", technical_plan, 0.9
             )
-            
+
             # Gera capability token para operações técnicas
             token = self.guardrails.token_manager.generate_token(
-                self.agent_id, 'technical_planning', ['task_creation', 'stack_definition']
+                self.agent_id,
+                "technical_planning",
+                ["task_creation", "stack_definition"],
             )
-            
+
             return {
-                'status': 'success',
-                'technical_tasks': technical_plan,
-                'capability_token': token.token_id
+                "status": "success",
+                "technical_tasks": technical_plan,
+                "capability_token": token.token_id,
             }
         except Exception as e:
             logger.error(f"Erro no parsing da resposta do Tech Lead: {str(e)}")

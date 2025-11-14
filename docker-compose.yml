@@ -62,48 +62,48 @@ services:
     networks:
       - db_net
 
-  open-webui:
-    image: ghcr.io/open-webui/open-webui:main
-    container_name: open-webui
-    restart: no
-    ports:
-      - "8383:8080"
-    environment:
-      - DEFAULT_USER=admin@gmail.com
-      - DEFAULT_PASSWORD=221232
-      - OLLAMA_BASE_URL=http://ollama:11434
-    volumes:
-      - open-webui-data:/app/backend/data
-    networks:
-      - db_net
-    depends_on:
-      - ollama
+  # open-webui:
+  #   image: ghcr.io/open-webui/open-webui:main
+  #   container_name: open-webui
+  #   restart: no
+  #   ports:
+  #     - "8383:8080"
+  #   environment:
+  #     - DEFAULT_USER=admin@gmail.com
+  #     - DEFAULT_PASSWORD=221232
+  #     - OLLAMA_BASE_URL=http://ollama:11434
+  #   volumes:
+  #     - open-webui-data:/app/backend/data
+  #   networks:
+  #     - db_net
+  #   depends_on:
+  #     - ollama
 
-  app:
-    container_name: devs-ai
-    build: .
-    ports:
-      - "8181:8181"
-    volumes:
-      - chroma_data:/app/chroma_data
-      - logs:/app/logs
-    environment:
-      - PORT=8181
-      - CHROMA_DB_HOST=chromadb
-      - CHROMA_DB_PORT=8000
-      - POSTGRES_DB=minha_base
-      - POSTGRES_USER=usuario
-      - POSTGRES_PASSWORD=senha
-      - POSTGRES_HOST=postgres
-      - REDIS_HOST=redis-stack
-      - REDIS_PORT=6379
-    networks:
-      - db_net
-    depends_on:
-      - chromadb
-      - postgres
-      - redis-stack
-    restart: no
+  # app:
+  #   container_name: devs-ai
+  #   build: .
+  #   ports:
+  #     - "8181:8181"
+  #   volumes:
+  #     - chroma_data:/app/chroma_data
+  #     - logs:/app/logs
+  #   environment:
+  #     - PORT=8181
+  #     - CHROMA_DB_HOST=chromadb
+  #     - CHROMA_DB_PORT=8000
+  #     - POSTGRES_DB=minha_base
+  #     - POSTGRES_USER=usuario
+  #     - POSTGRES_PASSWORD=senha
+  #     - POSTGRES_HOST=postgres
+  #     - REDIS_HOST=redis-stack
+  #     - REDIS_PORT=6379
+  #   networks:
+  #     - db_net
+  #   depends_on:
+  #     - chromadb
+  #     - postgres
+  #     - redis-stack
+  #   restart: no
 
 volumes:
   open-webui-data:

@@ -81,13 +81,12 @@ async def lifespan(app: FastAPI):
 
         from pathlib import Path
 
-        migration_path = Path(__file__).parent.parent / "database" / "migrations" / "001_create_jobs_table.sql"
-        if migration_path.exists():
-            pool = await DatabaseConnection.get_pool()
-            async with pool.acquire() as conn:
-                migration_sql = migration_path.read_text()
-                await conn.execute(migration_sql)
-                logger.info("Migração do banco de dados executada com sucesso")
+        from database.migration_manager import MigrationManager
+
+        migrations_dir = Path(__file__).parent.parent / "database" / "migrations"
+        migration_manager = MigrationManager(migrations_dir)
+        pool = await DatabaseConnection.get_pool()
+        await migration_manager.run_migrations(pool)
 
         job_processor = JobProcessor(system)
         job_manager = JobManager()

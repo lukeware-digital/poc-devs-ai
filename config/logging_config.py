@@ -7,6 +7,13 @@ MAX_BYTES = 10 * 1024 * 1024
 BACKUP_COUNT = 5
 
 
+class AgentFormatter(logging.Formatter):
+    def format(self, record):
+        if not hasattr(record, "agent_id"):
+            record.agent_id = "system"
+        return super().format(record)
+
+
 def setup_logging(level: int = logging.INFO) -> logging.Logger:
     logger = logging.getLogger("DEVs_AI")
     logger.setLevel(level)
@@ -14,7 +21,7 @@ def setup_logging(level: int = logging.INFO) -> logging.Logger:
     if logger.handlers:
         return logger
 
-    formatter = logging.Formatter(
+    formatter = AgentFormatter(
         "%(asctime)s - %(name)s - %(levelname)s - [%(agent_id)s] - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
 
@@ -26,9 +33,7 @@ def setup_logging(level: int = logging.INFO) -> logging.Logger:
 
     console_handler = logging.StreamHandler()
     console_handler.setLevel(level)
-    console_formatter = logging.Formatter(
-        "%(asctime)s - %(levelname)s - [%(agent_id)s] - %(message)s", datefmt="%H:%M:%S"
-    )
+    console_formatter = AgentFormatter("%(asctime)s - %(levelname)s - [%(agent_id)s] - %(message)s", datefmt="%H:%M:%S")
     console_handler.setFormatter(console_formatter)
 
     logger.addHandler(file_handler)

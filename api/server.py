@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -16,7 +17,6 @@ from utils.git_utils import create_archive
 
 logger = logging.getLogger("DEVs_AI")
 
-app = FastAPI(title="DEVs AI API", version="1.0.0")
 system: DEVsAISystem | None = None
 job_processor: JobProcessor | None = None
 job_manager: JobManager | None = None
@@ -35,8 +35,31 @@ class ProcessResponse(BaseModel):
     recovery_suggestions: list | None = None
 
 
-@app.on_event("startup")
-async def startup_event():
+async def _close_llm_provider(provider):
+    if hasattr(provider, "client") and hasattr(provider.client, "close"):
+        try:
+            await provider.client.close()
+        except Exception as e:
+            logger.warning(f"Erro ao fechar cliente LLM: {str(e)}")
+    if hasattr(provider, "session") and provider.session:
+        try:
+            if not provider.session.closed:
+                await provider.session.close()
+        except Exception as e:
+            logger.warning(f"Erro ao fechar sessão LLM: {str(e)}")
+
+
+async def _cleanup_llm_resources(system):
+    if not system.orchestrator or not hasattr(system.orchestrator, "llm_layer"):
+        return
+    if not hasattr(system.orchestrator.llm_layer, "providers"):
+        return
+    for provider in system.orchestrator.llm_layer.providers:
+        await _close_llm_provider(provider)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global system, job_processor, job_manager
     import os
 
@@ -73,33 +96,8 @@ async def startup_event():
         logger.error(f"Falha na inicialização do sistema: {str(e)}")
         raise
 
+    yield
 
-async def _close_llm_provider(provider):
-    if hasattr(provider, "client") and hasattr(provider.client, "close"):
-        try:
-            await provider.client.close()
-        except Exception as e:
-            logger.warning(f"Erro ao fechar cliente LLM: {str(e)}")
-    if hasattr(provider, "session") and provider.session:
-        try:
-            if not provider.session.closed:
-                await provider.session.close()
-        except Exception as e:
-            logger.warning(f"Erro ao fechar sessão LLM: {str(e)}")
-
-
-async def _cleanup_llm_resources(system):
-    if not system.orchestrator or not hasattr(system.orchestrator, "llm_layer"):
-        return
-    if not hasattr(system.orchestrator.llm_layer, "providers"):
-        return
-    for provider in system.orchestrator.llm_layer.providers:
-        await _close_llm_provider(provider)
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    global system, job_processor, job_manager
     if system:
         logger.info("Encerrando sistema DEVs AI")
         try:
@@ -110,6 +108,9 @@ async def shutdown_event():
     system = None
     job_processor = None
     job_manager = None
+
+
+app = FastAPI(title="DEVs AI API", version="1.0.0", lifespan=lifespan)
 
 
 @app.post("/api/process", response_model=ProcessResponse)

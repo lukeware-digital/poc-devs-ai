@@ -212,12 +212,10 @@ async def get_metrics():
         raise HTTPException(status_code=500, detail=f"Erro ao obter métricas: {str(e)}")
 
 
-@app.post("/api/jobs/start", response_model=JobResponse)
-async def start_job(request: JobRequest):
-    if not system or not system.is_initialized:
-        raise HTTPException(status_code=503, detail="Sistema não inicializado")
-    if not job_processor or not job_manager:
-        raise HTTPException(status_code=503, detail="Job processor não inicializado")
+@app.post("/api/jobs/create", response_model=JobResponse)
+async def create_job(request: JobRequest):
+    if not job_manager:
+        raise HTTPException(status_code=503, detail="Job manager não inicializado")
 
     try:
         job_data = {
@@ -240,12 +238,50 @@ async def start_job(request: JobRequest):
             user_input=request.user_input,
         )
 
-        task = asyncio.create_task(job_processor.process_job(job_id, request))
+        return JobResponse(
+            job_id=job_id,
+            status="pending",
+            message="Job created successfully",
+        )
+    except Exception as e:
+        logger.error(f"Erro ao criar job: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro ao criar job: {str(e)}")
+
+
+@app.post("/api/jobs/{job_id}/start", response_model=JobResponse)
+async def start_job(job_id: UUID):
+    if not system or not system.is_initialized:
+        raise HTTPException(status_code=503, detail="Sistema não inicializado")
+    if not job_processor or not job_manager:
+        raise HTTPException(status_code=503, detail="Job processor não inicializado")
+
+    job = await job_manager.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job não encontrado")
+
+    if job.get("status") not in ["pending", "failed"]:
+        raise HTTPException(status_code=400, detail=f"Job não pode ser iniciado. Status atual: {job.get('status')}")
+
+    try:
+        from database.job_request_repository import JobRequestRepository
+        from models.job_model import JobRequest
+
+        job_request_data = await JobRequestRepository.get_job_request(job_id)
+        if not job_request_data:
+            raise HTTPException(status_code=404, detail="Dados da requisição não encontrados para o job")
+
+        job_request = JobRequest(
+            repository_url=job_request_data["repository_url"],
+            access_token=job_request_data["access_token"],
+            user_input=job_request_data["user_input"],
+        )
+
+        task = asyncio.create_task(job_processor.process_job(job_id, job_request))
         job_manager.register_active_job(job_id, task)
 
         return JobResponse(
             job_id=job_id,
-            status="pending",
+            status="running",
             message="Development process started",
         )
     except Exception as e:
@@ -261,6 +297,9 @@ async def get_job(job_id: UUID):
     job = await job_manager.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job não encontrado")
+
+    if "id" in job:
+        job["job_id"] = job.pop("id")
 
     return JobStatus(**job)
 
@@ -306,6 +345,76 @@ async def approve_commit(job_id: UUID, request: CommitApprovalRequest):
         raise HTTPException(status_code=500, detail=f"Erro ao aprovar commit: {str(e)}")
 
 
+def _process_steps(steps: list[dict]) -> tuple[dict | None, dict]:
+    current_step = None
+    counts = {"completed": 0, "failed": 0, "running": 0, "pending": 0}
+
+    for step in steps:
+        step_status = step.get("status", "pending")
+        if step_status in counts:
+            counts[step_status] += 1
+        if step_status in ("running", "pending") and not current_step:
+            current_step = step
+
+    if not current_step and steps:
+        current_step = steps[-1]
+
+    return current_step, counts
+
+
+def _build_validation(job: dict) -> dict:
+    status = job.get("status")
+    return {
+        "job_exists": True,
+        "job_status": status,
+        "is_valid": status not in ["cancelled"],
+        "can_start": status in ["pending", "failed"],
+        "can_approve_commit": status == "pending_approval",
+        "is_completed": status == "completed",
+        "is_running": status == "running",
+        "has_error": job.get("error_message") is not None,
+    }
+
+
+@app.get("/api/jobs/{job_id}/validate")
+async def validate_job(job_id: UUID):
+    if not job_manager:
+        raise HTTPException(status_code=503, detail="Job manager não inicializado")
+
+    job = await job_manager.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job não encontrado")
+
+    from database.step_repository import StepRepository
+
+    steps = await StepRepository.get_steps_by_job(job_id)
+
+    if "id" in job:
+        job["job_id"] = job.pop("id")
+
+    current_step, counts = _process_steps(steps)
+    validation = _build_validation(job)
+
+    return {
+        "job_id": str(job_id),
+        "job": job,
+        "validation": validation,
+        "current_step": {
+            "step": current_step,
+            "job_current_step": job.get("current_step"),
+            "progress": job.get("progress", 0.0),
+        },
+        "steps_summary": {
+            "total": len(steps),
+            "completed": counts["completed"],
+            "running": counts["running"],
+            "pending": counts["pending"],
+            "failed": counts["failed"],
+        },
+        "steps": steps,
+    }
+
+
 @app.get("/api/jobs/{job_id}/download")
 async def download_job(job_id: UUID):
     if not job_manager:
@@ -341,11 +450,13 @@ async def root():
             "status": "/api/status",
             "metrics": "/api/metrics",
             "jobs": {
-                "start": "/api/jobs/start",
+                "create": "/api/jobs/create",
+                "start": "/api/jobs/{job_id}/start",
                 "get": "/api/jobs/{job_id}",
                 "list": "/api/jobs",
                 "cancel": "/api/jobs/{job_id}/cancel",
                 "approve_commit": "/api/jobs/{job_id}/approve-commit",
+                "validate": "/api/jobs/{job_id}/validate",
                 "download": "/api/jobs/{job_id}/download",
             },
         },

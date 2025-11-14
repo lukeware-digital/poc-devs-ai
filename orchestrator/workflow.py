@@ -233,12 +233,18 @@ class DEVsAIOrchestrator:
             },
         )
 
+        def _get_phase_str(phase: any) -> str:
+            if isinstance(phase, dict):
+                return phase.get("value", phase.get("phase", "initial"))
+            return str(phase) if phase else "initial"
+
         def check_agent8_next(state: ProjectState) -> str:
             if not state.last_operation.get("success", True):
                 return "human_intervention"
-            if state.current_phase == "review_loop":
+            phase_str = _get_phase_str(state.current_phase)
+            if phase_str == "review_loop":
                 return "continue_review"
-            if state.current_phase == "project_complete":
+            if phase_str == "project_complete":
                 return "end"
             return "human_intervention"
 
@@ -259,6 +265,15 @@ class DEVsAIOrchestrator:
         workflow.set_entry_point("agent1")
         return workflow.compile()
 
+    def _get_phase_string(self, phase: any) -> str:
+        """Extrai string de fase de dict ou retorna string diretamente"""
+        if isinstance(phase, dict):
+            value = phase.get("value") or phase.get("phase")
+            if value is not None:
+                return self._get_phase_string(value)
+            return "initial"
+        return str(phase) if phase else "initial"
+
     async def _prepare_agent_execution(self, agent_id: str, state: ProjectState) -> bool:
         if not self.single_agent_mode:
             return True
@@ -266,21 +281,26 @@ class DEVsAIOrchestrator:
         model_name = self.config.get("agent_models", {}).get(agent_id, self.config.get("primary_model", ""))
         ready = await self.llm_manager.ensure_model_ready(agent_id, model_name)
 
-        if ready and state.job_id:
+        if state.job_id:
             if state.current_step_id:
                 previous_step = await StepRepository.get_step(state.current_step_id)
                 if previous_step and previous_step.get("status") == "running":
                     await StepRepository.update_step_status(state.current_step_id, "completed")
 
-            step_name = f"{agent_id}_{state.current_phase}"
+            phase_str = self._get_phase_string(state.current_phase)
+            step_name = f"{agent_id}_{phase_str}"
             step_id = await StepRepository.create_step(
                 job_id=state.job_id,
                 agent_id=agent_id,
                 step_name=step_name,
-                metadata={"phase": state.current_phase},
+                metadata={"phase": phase_str},
             )
             state.current_step_id = step_id
-            await StepRepository.update_step_status(step_id, "running")
+            
+            if ready:
+                await StepRepository.update_step_status(step_id, "running")
+            else:
+                workflow_logger.warning(f"Modelo não pronto para {agent_id}, step criado mas não iniciado")
 
         return ready
 
@@ -1406,6 +1426,7 @@ class DEVsAIOrchestrator:
         failing_agent = state.last_operation.get("agent", "unknown")
 
         # Registra alerta no sistema de monitoramento
+        phase_str = self._get_phase_string(state.current_phase)
         self.metrics_collector.record_alert(
             "human_intervention_required",
             {
@@ -1413,7 +1434,7 @@ class DEVsAIOrchestrator:
                 "error": error_details,
                 "failure_count": state.failure_count,
                 "recovery_attempts": state.recovery_attempts,
-                "current_phase": state.current_phase,
+                "current_phase": phase_str,
             },
         )
 
@@ -1468,19 +1489,24 @@ class DEVsAIOrchestrator:
             workflow_logger.info("Executando workflow...")
             final_state = await self.workflow.ainvoke(initial_state, config=config)
 
+            if isinstance(final_state, dict):
+                final_state = ProjectState(**final_state)
+
             execution_time = (datetime.utcnow() - initial_state.timestamp).total_seconds()
             phases_completed = self._get_completed_phases(final_state)
 
             workflow_logger.info(f"=== Workflow concluído em {execution_time:.2f}s ===")
             workflow_logger.info(f"Fases completadas: {', '.join(phases_completed)}")
-            workflow_logger.info(f"Status final: {final_state.current_phase}")
+
+            phase_str = self._get_phase_string(final_state.current_phase)
+            workflow_logger.info(f"Status final: {phase_str}")
 
             return {
                 "success": True,
                 "execution_time": execution_time,
                 "phases_completed": phases_completed,
                 "final_state": final_state.dict(),
-                "project_status": final_state.current_phase,
+                "project_status": phase_str,
             }
 
         except Exception as e:
@@ -1494,16 +1520,20 @@ class DEVsAIOrchestrator:
             # Gera sugestões de recuperação
             recovery_suggestions = self._generate_recovery_suggestions(e)
 
+            phase_str = self._get_phase_string(initial_state.current_phase)
             return {
                 "success": False,
                 "error": str(e),
                 "execution_time": (datetime.utcnow() - initial_state.timestamp).total_seconds(),
                 "recovery_suggestions": recovery_suggestions,
-                "failed_phase": initial_state.current_phase,
+                "failed_phase": phase_str,
             }
 
-    def _get_completed_phases(self, state: ProjectState) -> list[str]:
+    def _get_completed_phases(self, state: ProjectState | dict) -> list[str]:
         """Identifica quais fases foram completadas com sucesso"""
+        if isinstance(state, dict):
+            state = ProjectState(**state)
+
         phases = []
         if state.task_specification:
             phases.append("requirements_analysis")

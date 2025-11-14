@@ -649,6 +649,22 @@ class DEVsAIOrchestrator:
     async def fallback_agent_node(self, state: ProjectState) -> ProjectState:
         """Nó de fallback genérico usando FallbackHandler"""
         failing_agent = state.last_operation.get("agent", "unknown")
+        
+        # Detecta loops: verifica se o mesmo agente falhou muitas vezes
+        max_retry_attempts = self.config.get("orchestrator", {}).get("max_retry_attempts", 3)
+        if state.recovery_attempts >= max_retry_attempts:
+            logger.error(
+                f"Loop detectado! Agente {failing_agent} falhou após {state.recovery_attempts} tentativas. "
+                f"Parando workflow para evitar loop infinito."
+            )
+            state.last_operation = {
+                "success": False,
+                "agent": f"fallback_{failing_agent}",
+                "error": f"Loop infinito detectado: agente {failing_agent} falhou {state.recovery_attempts} vezes",
+                "timestamp": datetime.utcnow(),
+            }
+            return state
+        
         return await self.fallback_handler.apply_fallback(state, failing_agent)
 
     async def fallback_agent1_node(self, state: ProjectState) -> ProjectState:
@@ -1020,6 +1036,21 @@ class DEVsAIOrchestrator:
         """Executa rollback de estado"""
         logger.warning("Executando rollback de estado")
 
+        # Detecta loops: se recovery_attempts for muito alto, pode indicar loop
+        max_recovery_attempts = self.config.get("orchestrator", {}).get("max_retry_attempts", 3)
+        if state.recovery_attempts >= max_recovery_attempts:
+            logger.error(
+                f"Loop detectado! Número de tentativas de recuperação ({state.recovery_attempts}) "
+                f"excedeu o limite ({max_recovery_attempts}). Parando workflow."
+            )
+            state.last_operation = {
+                "success": False,
+                "agent": "rollback",
+                "error": f"Loop infinito detectado após {state.recovery_attempts} tentativas de recuperação",
+                "timestamp": datetime.utcnow(),
+            }
+            return state
+
         # Reverte para o último estado bom conhecido
         state.failure_count = 0
         state.recovery_attempts += 1
@@ -1089,9 +1120,17 @@ class DEVsAIOrchestrator:
             timestamp=datetime.utcnow(),
         )
 
+        recursion_limit = self.config.get("orchestrator", {}).get("recursion_limit", 15)
+
         try:
-            # Executa o workflow
-            final_state = await self.workflow.ainvoke(initial_state)
+            # Executa o workflow com recursion limit
+            config = {"recursion_limit": recursion_limit}
+            
+            # Log quando se aproxima do limite
+            if recursion_limit <= 20:
+                logger.info(f"Executando workflow com limite de recursão: {recursion_limit}")
+            
+            final_state = await self.workflow.ainvoke(initial_state, config=config)
 
             # Calcula métricas finais
             execution_time = (datetime.utcnow() - initial_state.timestamp).total_seconds()

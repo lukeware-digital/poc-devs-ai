@@ -145,8 +145,13 @@ class DEVsAISystem:
         
         logger.info(f"Processando solicitação: {user_input[:100]}...")
         start_time = datetime.now(timezone.utc)
+        timeout = self.config.get("orchestrator", {}).get("request_timeout", 600)
+        
         try:
-            result = await self.orchestrator.execute_workflow(user_input)
+            result = await asyncio.wait_for(
+                self.orchestrator.execute_workflow(user_input),
+                timeout=timeout
+            )
             execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
             
             # Coleta métricas (se disponível)
@@ -163,6 +168,33 @@ class DEVsAISystem:
             result['execution_time'] = execution_time
             result['timestamp'] = datetime.now(timezone.utc).isoformat()
             return result
+        except asyncio.TimeoutError:
+            execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
+            error_msg = f"Processamento excedeu o tempo limite de {timeout} segundos"
+            logger.error(error_msg)
+            
+            if self.metrics_collector:
+                try:
+                    self.metrics_collector.record_agent_metrics('system', {
+                        'success_rate': 0,
+                        'avg_response_time': execution_time,
+                        'total_requests': 1,
+                        'error': 'timeout'
+                    })
+                except Exception as metrics_error:
+                    logger.warning(f"Erro ao registrar métricas de timeout: {str(metrics_error)}")
+            
+            return {
+                'success': False,
+                'error': error_msg,
+                'execution_time': execution_time,
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'recovery_suggestions': [
+                    'A solicitação pode ser muito complexa',
+                    'Tente dividir em solicitações menores',
+                    'Verifique se os serviços estão respondendo corretamente'
+                ]
+            }
         except Exception as e:
             execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
             logger.error(f"Erro no processamento: {str(e)}", exc_info=True)
@@ -278,52 +310,32 @@ class DEVsAISystem:
 
 async def main():
     """Função principal de inicialização do sistema"""
-    from utils.hardware_detection import detect_hardware_profile
+    import sys
     
-    # Detecta perfil de hardware automaticamente
-    hardware_profile = detect_hardware_profile()
-    config_path = f"config/hardware_profiles/{hardware_profile}.yaml"
-    
-    system = DEVsAISystem(config_path)
-    try:
-        await system.initialize()
-        print("🚀 DEVs AI Sistema Completo Inicializado!")
-        print(f"📊 Agentes Carregados: {len(system.orchestrator.agents)}")
-        print(f"⚙️  Perfil de Hardware: {hardware_profile}")
-        print("=" * 50)
+    if len(sys.argv) > 1 and sys.argv[1] == "api":
+        import uvicorn
+        from api.server import app
         
-        # Testa com uma solicitação de exemplo
-        user_request = """
-        Desenvolva um sistema de gerenciamento de tarefas (To-Do List) com:
-        - API REST para CRUD de tarefas
-        - Interface web moderna
-        - Autenticação de usuários
-        - Categorização de tarefas
-        - Busca e filtros
-        - Deploy em Docker
-        """
-        print("📝 Processando solicitação...")
-        start_time = datetime.now(timezone.utc)
-        result = await system.process_request(user_request)
-        execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
-        print(f"⏱️  Tempo de execução: {execution_time:.2f} segundos")
+        logger.info("Iniciando servidor API...")
+        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    else:
+        from utils.hardware_detection import detect_hardware_profile
         
-        if result['success']:
-            print("✅ Projeto concluído com sucesso!")
-            final_state = result['final_state']
-            print(f"📈 Fases completadas: {final_state['current_phase']}")
-            print(f"📁 Estrutura criada: {len(final_state.get('project_structure', {}).get('project_structure', []))} itens")
-            print(f"👨‍💻 Tasks implementadas: {len(final_state.get('implemented_code', {}))}")
-            print(f"🔍 Revisões realizadas: {len(final_state.get('code_review', {}))}")
-            if final_state.get('final_delivery'):
-                print("🎉 Entrega final preparada!")
-        else:
-            print("❌ Erro no processamento:")
-            print(f"   Erro: {result.get('error')}")
-            print(f"   Sugestões: {result.get('recovery_suggestions', [])}")
-    except Exception as e:
-        logger.error(f"Erro na execução: {str(e)}")
-        sys.exit(1)
+        hardware_profile = detect_hardware_profile()
+        config_path = f"config/hardware_profiles/{hardware_profile}.yaml"
+        
+        system = DEVsAISystem(config_path)
+        try:
+            await system.initialize()
+            print("🚀 DEVs AI Sistema Completo Inicializado!")
+            print(f"📊 Agentes Carregados: {len(system.orchestrator.agents)}")
+            print(f"⚙️  Perfil de Hardware: {hardware_profile}")
+            print("=" * 50)
+            print("💡 Para iniciar o servidor API, execute: python main.py api")
+            print("💡 Para processar solicitações, use a API REST em /api/process")
+        except Exception as e:
+            logger.error(f"Erro na execução: {str(e)}")
+            sys.exit(1)
 
 
 if __name__ == "__main__":

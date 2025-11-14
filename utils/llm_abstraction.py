@@ -357,6 +357,21 @@ class LLMAbstractLayer:
 
         return self.providers
 
+    def _is_valid_response(self, response: str) -> bool:
+        """
+        Valida se a resposta é válida antes de armazenar no cache.
+        Não cacheia respostas vazias ou muito curtas.
+        """
+        if not response or not response.strip():
+            return False
+        
+        response_stripped = response.strip()
+        
+        if len(response_stripped) < 3:
+            return False
+        
+        return True
+
     async def generate_response(
         self,
         prompt: str,
@@ -407,9 +422,12 @@ class LLMAbstractLayer:
                 )
                 generation_time = time.time() - start_time
 
-                # Armazena no cache
+                # Valida resposta antes de armazenar no cache
                 model_info = provider.get_model_info()
-                self.cache.set(prompt, temperature, max_tokens, model_info['name'], response)
+                if self._is_valid_response(response):
+                    self.cache.set(prompt, temperature, max_tokens, model_info['name'], response)
+                else:
+                    logger.warning(f"Resposta inválida não será armazenada no cache: {response[:100] if response else 'vazia'}")
 
                 logger.info(f"Resposta gerada com {model_info['name']} (agent: {agent_id or 'default'}) em {generation_time:.2f}s")
                 return response

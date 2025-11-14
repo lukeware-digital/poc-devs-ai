@@ -46,6 +46,9 @@ def load_configuration(config_path: str = None) -> dict:
             "max_auto_retries": 2,
             "state_checkpoint_interval": 60,
             "circuit_breaker": {"failure_threshold": 3, "reset_timeout": 300},
+            "request_timeout": 600,
+            "recursion_limit": 15,
+            "max_retry_attempts": 3,
         },
         "performance": {
             "batch_processing": True,

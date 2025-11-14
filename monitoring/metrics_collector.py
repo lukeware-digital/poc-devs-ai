@@ -106,14 +106,22 @@ class MetricsCollector:
 
         if np.mean(success_rates) < 50 and np.std(success_rates) > 20:
             anomaly_score = 100 - np.mean(success_rates)
-            self._alert_anomaly(agent_id, "falling_success_rate", anomaly_score)
+            context = {
+                "current_phase": recent_metrics[-1].get("current_phase", "unknown"),
+                "success_rate": np.mean(success_rates),
+            }
+            self._alert_anomaly(agent_id, "falling_success_rate", anomaly_score, context)
 
         # Verifica tempo de resposta
         response_times = [m.get("avg_response_time", m.get("execution_time", 0)) for m in recent_metrics]
 
         if np.mean(response_times) > 30 and np.std(response_times) > 10:  # 30 segundos
             anomaly_score = min(100, np.mean(response_times) * 3)
-            self._alert_anomaly(agent_id, "increasing_response_time", anomaly_score)
+            context = {
+                "current_phase": recent_metrics[-1].get("current_phase", "unknown"),
+                "avg_response_time": np.mean(response_times),
+            }
+            self._alert_anomaly(agent_id, "increasing_response_time", anomaly_score, context)
 
         # Verifica falhas consecutivas
         consecutive_failures = 0
@@ -125,25 +133,69 @@ class MetricsCollector:
 
         if consecutive_failures >= 3:
             anomaly_score = consecutive_failures * 30
-            self._alert_anomaly(agent_id, "consecutive_failures", anomaly_score)
+            context = {
+                "consecutive_failures": consecutive_failures,
+                "current_phase": recent_metrics[-1].get("current_phase", "unknown"),
+                "retry_attempts": recent_metrics[-1].get("retry_attempts", 0),
+                "error": recent_metrics[-1].get("error"),
+            }
+            self._alert_anomaly(agent_id, "consecutive_failures", anomaly_score, context)
 
-    def _alert_anomaly(self, agent_id: str, anomaly_type: str, score: float):
+    def _alert_anomaly(self, agent_id: str, anomaly_type: str, score: float, context: dict[str, any] = None):
         """
-        Cria alerta de anomalia
+        Cria alerta de anomalia com contexto detalhado
         """
+        import traceback
+        
+        context = context or {}
+        recent_metrics = self.metrics_history.get(agent_id, [])
+        last_metric = recent_metrics[-1] if recent_metrics else {}
+        
+        consecutive_failures = 0
+        for metric in reversed(recent_metrics[-10:]):
+            if not metric.get("success", metric.get("success_rate", 100) < 50):
+                consecutive_failures += 1
+            else:
+                break
+        
+        stack_trace = None
+        try:
+            stack_trace = "".join(traceback.format_stack()[-5:-1])
+        except Exception:
+            pass
+        
         alert = {
             "timestamp": datetime.utcnow().isoformat(),
             "agent_id": agent_id,
             "anomaly_type": anomaly_type,
             "anomaly_score": score,
             "severity": self._determine_severity(score),
-            "details": f"Anomalia detectada no agente {agent_id}: {anomaly_type} com score {score:.2f}",
+            "consecutive_failures": consecutive_failures,
+            "retry_attempts": context.get("retry_attempts", last_metric.get("retry_attempts", 0)),
+            "current_phase": context.get("current_phase", last_metric.get("current_phase", "unknown")),
+            "last_error": context.get("error", last_metric.get("error")),
+            "execution_time": last_metric.get("execution_time", last_metric.get("avg_response_time", 0)),
+            "stack_trace": stack_trace,
+            "details": (
+                f"Anomalia detectada no agente {agent_id}: {anomaly_type} com score {score:.2f}. "
+                f"Falhas consecutivas: {consecutive_failures}, "
+                f"Fase atual: {context.get('current_phase', 'unknown')}, "
+                f"Tentativas: {context.get('retry_attempts', 0)}"
+            ),
         }
 
         self.alerts.append(alert)
-        logger.warning(f"⚠️ {alert['details']}")
+        logger.warning(
+            f"⚠️ {alert['details']}",
+            extra={
+                "agent_id": agent_id,
+                "anomaly_type": anomaly_type,
+                "score": score,
+                "consecutive_failures": consecutive_failures,
+                "current_phase": context.get("current_phase", "unknown"),
+            }
+        )
 
-        # Em produção, aqui enviaria notificação para equipe
         if alert["severity"] in ["critical", "high"]:
             self._notify_critical_anomaly(alert)
 
@@ -164,10 +216,19 @@ class MetricsCollector:
 
     def _notify_critical_anomaly(self, alert: dict[str, any]):
         """
-        Notifica sobre anomalia crítica
+        Notifica sobre anomalia crítica com contexto completo
         """
-        # Em implementação real, aqui enviaria email, slack, etc.
-        logger.critical(f"🚨 ANOMALIA CRÍTICA: {json.dumps(alert)}")
+        logger.critical(
+            f"🚨 ANOMALIA CRÍTICA [{alert['severity']}]: {alert['details']}\n"
+            f"   Agent: {alert['agent_id']}, Tipo: {alert['anomaly_type']}, Score: {alert['anomaly_score']:.2f}\n"
+            f"   Falhas consecutivas: {alert.get('consecutive_failures', 0)}, "
+            f"Fase: {alert.get('current_phase', 'unknown')}, "
+            f"Tentativas: {alert.get('retry_attempts', 0)}\n"
+            f"   Erro: {alert.get('last_error', 'N/A')}\n"
+            f"   Timestamp: {alert['timestamp']}"
+        )
+        if alert.get("stack_trace"):
+            logger.debug(f"Stack trace: {alert['stack_trace']}")
 
     def _collect_system_metrics(self):
         """

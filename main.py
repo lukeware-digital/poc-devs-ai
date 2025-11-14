@@ -129,12 +129,9 @@ class DEVsAISystem:
         ]
         for prompt in common_prompts:
             try:
-                await asyncio.wait_for(
-                    self.orchestrator.llm_layer.generate_response(prompt, 0.3),
-                    timeout=5.0
-                )
+                await asyncio.wait_for(self.orchestrator.llm_layer.generate_response(prompt, 0.3), timeout=5.0)
             except asyncio.TimeoutError:
-                logger.warning(f"Timeout ao pré-carregar prompt (limite: 5s)")
+                logger.warning("Timeout ao pré-carregar prompt (limite: 5s)")
             except Exception as e:
                 logger.warning(f"Falha ao pré-carregar prompt: {str(e)}")
 

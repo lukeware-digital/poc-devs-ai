@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -10,6 +11,41 @@ from git import Repo
 from git.exc import GitCommandError
 
 logger = logging.getLogger("DEVs_AI")
+
+AGENT_CONFIG = {
+    "agent1": {
+        "name": "Clarificador DEVs AI",
+        "email": "clarificador@devs-ai.local",
+    },
+    "agent2": {
+        "name": "Product Manager DEVs AI",
+        "email": "product-manager@devs-ai.local",
+    },
+    "agent3": {
+        "name": "Arquiteto DEVs AI",
+        "email": "arquiteto@devs-ai.local",
+    },
+    "agent4": {
+        "name": "Tech Lead DEVs AI",
+        "email": "tech-lead@devs-ai.local",
+    },
+    "agent5": {
+        "name": "Scaffolder DEVs AI",
+        "email": "scaffolder@devs-ai.local",
+    },
+    "agent6": {
+        "name": "Desenvolvedor DEVs AI",
+        "email": "desenvolvedor@devs-ai.local",
+    },
+    "agent7": {
+        "name": "Code Reviewer DEVs AI",
+        "email": "code-reviewer@devs-ai.local",
+    },
+    "agent8": {
+        "name": "Finalizador DEVs AI",
+        "email": "finalizador@devs-ai.local",
+    },
+}
 
 
 class AuthenticationError(Exception):
@@ -20,14 +56,52 @@ class GitService:
     def __init__(self):
         pass
 
+    def _configure_git_no_prompt(self, repo_path: str | None = None):
+        os.environ["GIT_TERMINAL_PROMPT"] = "0"
+        try:
+            if repo_path:
+                subprocess.run(
+                    ["git", "config", "core.askPass", ""],
+                    cwd=repo_path,
+                    check=True,
+                    capture_output=True,
+                )
+            else:
+                subprocess.run(
+                    ["git", "config", "core.askPass", ""],
+                    check=True,
+                    capture_output=True,
+                )
+        except subprocess.CalledProcessError:
+            pass
+
+    def _configure_agent_git_identity(self, repo_path: str, agent_id: str):
+        agent_config = AGENT_CONFIG.get(agent_id, AGENT_CONFIG["agent8"])
+        try:
+            subprocess.run(
+                ["git", "config", "user.name", agent_config["name"]],
+                cwd=repo_path,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.email", agent_config["email"]],
+                cwd=repo_path,
+                check=True,
+                capture_output=True,
+            )
+            logger.info(f"Git configurado para agente {agent_id}: {agent_config['name']}")
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"Erro ao configurar git para agente {agent_id}: {str(e)}")
+
     async def clone_repository(self, repo_url: str, token: str, target_path: str) -> str:
         def _clone():
-            os.environ["GIT_TERMINAL_PROMPT"] = "0"
-            
             target = Path(target_path)
             if target.exists():
                 shutil.rmtree(target)
             target.mkdir(parents=True, exist_ok=True)
+
+            self._configure_git_no_prompt()
 
             parsed_url = urlparse(repo_url)
             if parsed_url.scheme in ("http", "https"):
@@ -117,9 +191,13 @@ class GitService:
 
         return await asyncio.to_thread(_init)
 
-    async def create_commit(self, repo_path: str, message: str, files: list | None = None) -> bool:
+    async def create_commit(
+        self, repo_path: str, message: str, files: list | None = None, agent_id: str | None = None
+    ) -> bool:
         def _commit():
             try:
+                self._configure_agent_git_identity(repo_path, agent_id or "agent8")
+
                 repo = Repo(str(repo_path))
                 if files:
                     for file_path in files:
@@ -136,9 +214,13 @@ class GitService:
 
         return await asyncio.to_thread(_commit)
 
-    async def push_changes(self, repo_path: str, repo_url: str, token: str) -> bool:
+    async def push_changes(self, repo_path: str, repo_url: str, token: str, agent_id: str | None = None) -> bool:
         def _push():
             try:
+                self._configure_git_no_prompt(repo_path)
+
+                self._configure_agent_git_identity(repo_path, agent_id or "agent8")
+
                 repo = Repo(str(repo_path))
                 origin = repo.remote(name="origin")
                 if not origin:

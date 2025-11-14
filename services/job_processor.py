@@ -28,7 +28,7 @@ class JobProcessor:
 
             project_path = f"./temp/local/{job_id}"
             ensure_temp_directory(project_path)
-            
+
             await self.job_manager.update_job_project_path(job_id, project_path)
             await self.job_manager.update_job_status(
                 job_id, current_step="Preparando diretório do projeto", progress=5.0
@@ -41,7 +41,7 @@ class JobProcessor:
                         job_request.repository_url, job_request.access_token, project_path
                     )
                 except AuthenticationError as e:
-                    error_msg = f"Erro de autenticação: Token inválido ou sem permissão para acessar o repositório"
+                    error_msg = "Erro de autenticação: Token inválido ou sem permissão para acessar o repositório"
                     logger.error(f"Erro de autenticação ao clonar repositório: {str(e)}")
                     await self.job_manager.update_job_status(
                         job_id,
@@ -127,7 +127,7 @@ class JobProcessor:
         try:
             await self.job_manager.update_job_status(job_id, current_step="Criando commit", progress=97.0)
 
-            await self.git_service.create_commit(project_path, commit_message)
+            await self.git_service.create_commit(project_path, commit_message, agent_id="agent8")
 
             if request_data.get("repository_url"):
                 await self.job_manager.update_job_status(job_id, current_step="Fazendo push", progress=99.0)
@@ -135,6 +135,7 @@ class JobProcessor:
                     project_path,
                     request_data["repository_url"],
                     request_data["access_token"],
+                    agent_id="agent8",
                 )
 
             await self.job_manager.update_job_status(

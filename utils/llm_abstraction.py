@@ -431,9 +431,7 @@ class LLMAbstractLayer:
                     )
 
                 agent_name = agent_id or "default"
-                logger.info(
-                    f"Resposta gerada com {model_info['name']} (agent: {agent_name}) em {generation_time:.2f}s"
-                )
+                logger.info(f"Resposta gerada com {model_info['name']} (agent: {agent_name}) em {generation_time:.2f}s")
                 return response
 
             except Exception as e:

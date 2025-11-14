@@ -28,6 +28,9 @@ class ProjectState(BaseModel):
     project_path: str | None = None
     job_id: UUID | None = None
     current_step_id: UUID | None = None
+    repository_url: str | None = None
+    access_token: str | None = None
+    code_review_count: int = 0
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:

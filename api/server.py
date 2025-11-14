@@ -222,13 +222,23 @@ async def start_job(request: JobRequest):
     try:
         job_data = {
             "status": "pending",
-            "repository_url": request.repository_url,
+            "repository_url": None,
             "project_path": None,
-            "user_input": request.user_input,
+            "user_input": None,
             "progress": 0.0,
             "current_step": "Criando job",
+            "access_token": None,
         }
         job_id = await job_manager.create_job(job_data)
+
+        from database.job_request_repository import JobRequestRepository
+
+        await JobRequestRepository.create_job_request(
+            job_id=job_id,
+            repository_url=request.repository_url,
+            access_token=request.access_token,
+            user_input=request.user_input,
+        )
 
         task = asyncio.create_task(job_processor.process_job(job_id, request))
         job_manager.register_active_job(job_id, task)
@@ -236,7 +246,7 @@ async def start_job(request: JobRequest):
         return JobResponse(
             job_id=job_id,
             status="pending",
-            message="Job criado e iniciado com sucesso",
+            message="Development process started",
         )
     except Exception as e:
         logger.error(f"Erro ao iniciar job: {str(e)}", exc_info=True)

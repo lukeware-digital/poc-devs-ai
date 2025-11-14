@@ -164,7 +164,12 @@ class DEVsAISystem:
         return response
 
     async def process_request(
-        self, user_input: str, project_path: str | None = None, job_id: str | None = None
+        self,
+        user_input: str,
+        project_path: str | None = None,
+        job_id: str | None = None,
+        repository_url: str | None = None,
+        access_token: str | None = None,
     ) -> dict[str, Any]:
         """Processa uma solicitação do usuário"""
         if not self.is_initialized:
@@ -180,7 +185,8 @@ class DEVsAISystem:
 
         try:
             result = await asyncio.wait_for(
-                self.orchestrator.execute_workflow(user_input, project_path, job_id), timeout=timeout
+                self.orchestrator.execute_workflow(user_input, project_path, job_id, repository_url, access_token),
+                timeout=timeout,
             )
             execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
             self._record_metrics(result.get("success", False), execution_time)

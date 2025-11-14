@@ -42,7 +42,7 @@ class BaseAgent:
         start_time = datetime.utcnow()
         operation = task.get("operation", "default")
 
-        self._logger.info(f"Iniciando tarefa: {operation}")
+        self._log_agent_status("iniciando", f"Operação: {operation}")
         self._logger.debug(f"Detalhes da tarefa: {self._sanitize_task_for_log(task)}")
 
         try:
@@ -53,6 +53,7 @@ class BaseAgent:
                 raise PermissionError(f"Operação não permitida: {reason}")
 
             self._logger.info("Permissão concedida, executando tarefa...")
+            self._log_agent_status("trabalhando", f"Processando tarefa: {operation}")
 
             result = await self._execute_task(task)
 
@@ -61,7 +62,7 @@ class BaseAgent:
             self.metrics["total_response_time"] += execution_time
             self.metrics["last_execution"] = datetime.utcnow()
 
-            self._logger.info(f"Tarefa concluída com sucesso em {execution_time:.2f}s")
+            self._log_agent_status("concluido_sucesso", f"Tarefa concluída com sucesso em {execution_time:.2f}s")
             self._logger.debug(f"Resultado: {self._sanitize_result_for_log(result)}")
 
             return result
@@ -71,7 +72,7 @@ class BaseAgent:
             self.metrics["failure_count"] += 1
 
             error_trace = traceback.format_exc()
-            self._logger.error(f"Erro na execução da tarefa após {execution_time:.2f}s: {str(e)}")
+            self._log_agent_status("concluido_erro", f"Erro após {execution_time:.2f}s: {str(e)}")
             self._logger.debug(f"Stack trace: {error_trace}")
 
             raise
@@ -166,3 +167,77 @@ class BaseAgent:
         """
         prompt_loader = self._get_prompt_loader()
         return prompt_loader.build_prompt(template_name, context)
+
+    def _log_agent_status(self, status: str, message: str):
+        """
+        Gera log grande e decorativo com ícone para status do agente.
+
+        Args:
+            status: Status do agente ('iniciando', 'trabalhando', 'concluido_sucesso', 'concluido_erro')
+            message: Mensagem adicional a ser exibida
+        """
+        icons = {"iniciando": "🚀", "trabalhando": "⚙️", "concluido_sucesso": "✅", "concluido_erro": "❌"}
+
+        status_texts = {
+            "iniciando": "INICIANDO",
+            "trabalhando": "TRABALHANDO",
+            "concluido_sucesso": "CONCLUÍDO",
+            "concluido_erro": "CONCLUÍDO COM ERRO",
+        }
+
+        icon = icons.get(status, "📋")
+        status_text = status_texts.get(status, status.upper())
+
+        border = "═" * 70
+        agent_name = self.agent_id.replace("_", " ").title()
+
+        log_message = f"""
+{border}
+{icon}  {status_text} - {agent_name}
+{border}
+{message}
+{border}
+"""
+
+        if status in ["concluido_sucesso"]:
+            self._logger.info(log_message)
+        elif status in ["concluido_erro"]:
+            self._logger.error(log_message)
+        else:
+            self._logger.info(log_message)
+
+    def _get_project_path(self) -> str | None:
+        """Obtém o project_path do contexto compartilhado"""
+        try:
+            project_path_value = self.shared_context.project_state.get("project_path")
+            if project_path_value is None:
+                return None
+            if isinstance(project_path_value, dict):
+                return project_path_value.get("value")
+            if isinstance(project_path_value, str):
+                return project_path_value
+            return None
+        except Exception:
+            return None
+
+    async def _save_markdown_file(self, filename: str, content: str) -> bool:
+        """Salva um arquivo markdown no project_path"""
+        try:
+            project_path = self._get_project_path()
+            if not project_path:
+                self._logger.warning(f"Não foi possível obter project_path para salvar {filename}")
+                return False
+
+            import os
+
+            file_path = os.path.join(project_path, filename)
+            os.makedirs(os.path.dirname(file_path) if os.path.dirname(file_path) else project_path, exist_ok=True)
+
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(content)
+
+            self._logger.info(f"Arquivo {filename} salvo em {file_path}")
+            return True
+        except Exception as e:
+            self._logger.error(f"Erro ao salvar arquivo {filename}: {str(e)}")
+            return False

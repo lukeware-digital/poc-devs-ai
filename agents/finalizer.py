@@ -16,26 +16,72 @@ class Agent8_Finalizador(BaseAgent):
         code_review = task.get("code_review", {})
         project_structure = task.get("project_structure", {})
         technical_tasks = task.get("technical_tasks", {})
+        repository_url = task.get("repository_url")
+        access_token = task.get("access_token")
+
+        # Verifica se existe code_review.md
+        project_path = self._get_project_path()
+        code_review_file = os.path.join(project_path, "code_review.md") if project_path else None
+        has_code_review = code_review_file and os.path.exists(code_review_file)
 
         # Obtém temperatura do config para este agente
         agent_config = getattr(self.shared_context, "config", {})
         temperature = agent_config.get("agents", {}).get("agent8", {}).get("temperature", 0.4)
 
-        # Aplica correções baseadas na revisão
+        if has_code_review:
+            return await self._handle_code_review_loop(code_review_file, implemented_code, code_review, temperature)
+        else:
+            return await self._handle_final_delivery(
+                implemented_code,
+                project_structure,
+                technical_tasks,
+                temperature,
+                project_path,
+                repository_url,
+                access_token,
+            )
+
+    async def _handle_code_review_loop(
+        self, code_review_file: str, implemented_code: dict[str, any], code_review: dict[str, any], temperature: float
+    ) -> dict[str, any]:
+        """Lida com o loop de code review"""
         corrections_applied = await self._apply_review_corrections(implemented_code, code_review, temperature)
 
-        # Gera documentação final
+        try:
+            os.remove(code_review_file)
+            logger.info(f"Arquivo code_review.md deletado: {code_review_file}")
+        except Exception as e:
+            logger.error(f"Erro ao deletar code_review.md: {str(e)}")
+
+        return {
+            "status": "success",
+            "corrections_applied": corrections_applied,
+            "code_review_deleted": True,
+            "should_loop_back": True,
+        }
+
+    async def _handle_final_delivery(
+        self,
+        implemented_code: dict[str, any],
+        project_structure: dict[str, any],
+        technical_tasks: dict[str, any],
+        temperature: float,
+        project_path: str | None,
+        repository_url: str | None,
+        access_token: str | None,
+    ) -> dict[str, any]:
+        """Lida com a entrega final do projeto"""
         documentation = await self._generate_comprehensive_documentation(
             implemented_code, project_structure, technical_tasks, temperature
         )
 
-        # Prepara entrega final
-        delivery_package = await self._prepare_final_delivery(corrections_applied, documentation, project_structure)
+        delivery_package = await self._prepare_final_delivery({}, documentation, project_structure)
 
-        # Atualiza contexto compartilhado
+        if project_path and repository_url and access_token:
+            await self._commit_and_push_changes(project_path, repository_url, access_token)
+
         await self.shared_context.update_decision(self.agent_id, "quality", "final_delivery", delivery_package, 0.95)
 
-        # Atualiza estado do projeto para completo
         await self.shared_context.update_decision(
             self.agent_id,
             "project",
@@ -46,11 +92,55 @@ class Agent8_Finalizador(BaseAgent):
 
         return {
             "status": "success",
-            "corrections_applied": corrections_applied,
+            "corrections_applied": {},
             "documentation_generated": documentation,
             "final_delivery": delivery_package,
             "project_complete": True,
+            "git_committed": True,
         }
+
+    async def _commit_and_push_changes(self, project_path: str, repository_url: str, access_token: str):
+        """Faz commit e push das mudanças"""
+        try:
+            from services.git_service import GitService
+
+            git_service = GitService()
+
+            await git_service.create_commit(project_path, "Development completed by DEVs AI", agent_id="agent8")
+            logger.info("Git commit criado com sucesso")
+
+            await git_service.push_changes(project_path, repository_url, access_token, agent_id="agent8")
+            logger.info("Git push realizado com sucesso")
+
+            await self._update_job_status_completed()
+        except Exception as e:
+            logger.error(f"Erro ao fazer git commit/push: {str(e)}")
+
+    async def _update_job_status_completed(self):
+        """Atualiza status do job para concluído"""
+        if not hasattr(self.shared_context, "config"):
+            return
+
+        from uuid import UUID
+
+        from database.job_repository import JobRepository
+
+        job_id_value = self.shared_context.project_state.get("job_id")
+        if not job_id_value:
+            return
+
+        if isinstance(job_id_value, dict):
+            job_id_value = job_id_value.get("value")
+
+        if isinstance(job_id_value, str):
+            job_id = UUID(job_id_value)
+        elif isinstance(job_id_value, UUID):
+            job_id = job_id_value
+        else:
+            return
+
+        if job_id:
+            await JobRepository.update_job_status(job_id, status="completed", current_step="Concluído", progress=100.0)
 
     async def _apply_review_corrections(
         self,
@@ -60,6 +150,8 @@ class Agent8_Finalizador(BaseAgent):
     ) -> dict[str, any]:
         """Aplica correções baseadas nas revisões de código"""
         corrections = {}
+        if not code_review:
+            return corrections
         for task_id, review in code_review.items():
             if not review.get("approved", False) or len(review.get("issues_found", [])) > 0:
                 # Aplica correções para tasks não aprovadas ou com issues

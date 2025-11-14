@@ -15,8 +15,11 @@ class JobRepository:
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                INSERT INTO jobs (status, repository_url, project_path, user_input, progress, current_step)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                INSERT INTO jobs (
+                    status, repository_url, project_path, user_input,
+                    progress, current_step, access_token
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
                 RETURNING id
                 """,
                 job_data.get("status", "pending"),
@@ -25,6 +28,7 @@ class JobRepository:
                 job_data.get("user_input"),
                 job_data.get("progress", 0.0),
                 job_data.get("current_step"),
+                job_data.get("access_token"),
             )
             return row["id"]
 
@@ -35,7 +39,7 @@ class JobRepository:
             row = await conn.fetchrow(
                 """
                 SELECT id, status, repository_url, project_path, progress, current_step,
-                       user_input, error_message, created_at, updated_at
+                       user_input, error_message, access_token, created_at, updated_at
                 FROM jobs
                 WHERE id = $1
                 """,
@@ -104,7 +108,7 @@ class JobRepository:
                 rows = await conn.fetch(
                     """
                     SELECT id, status, repository_url, project_path, progress, current_step,
-                           user_input, error_message, created_at, updated_at
+                           user_input, error_message, access_token, created_at, updated_at
                     FROM jobs
                     WHERE status = $1
                     ORDER BY created_at DESC
@@ -118,7 +122,7 @@ class JobRepository:
                 rows = await conn.fetch(
                     """
                     SELECT id, status, repository_url, project_path, progress, current_step,
-                           user_input, error_message, created_at, updated_at
+                           user_input, error_message, access_token, created_at, updated_at
                     FROM jobs
                     ORDER BY created_at DESC
                     LIMIT $1 OFFSET $2

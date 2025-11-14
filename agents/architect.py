@@ -88,6 +88,29 @@ Formato JSON:
                 0.9,
             )
 
+            # Salva architecture.md
+            md_content = "# Architecture\n\n"
+            arch_decision = architecture.get("architecture_decision", {})
+            md_content += "## Architecture Decision\n\n"
+            md_content += f"**Pattern:** {arch_decision.get('pattern', 'N/A')}\n\n"
+            md_content += f"**Rationale:** {arch_decision.get('rationale', 'N/A')}\n\n"
+            md_content += "**Alternatives Considered:**\n"
+            for alt in arch_decision.get("alternatives_considered", []):
+                md_content += f"- {alt}\n"
+            md_content += "\n## Components\n\n"
+            for component in architecture.get("components", []):
+                md_content += f"### {component.get('name', 'N/A')}\n\n"
+                md_content += f"**Responsibility:** {component.get('responsibility', 'N/A')}\n\n"
+                md_content += f"**Technology:** {component.get('technology', 'N/A')}\n\n"
+            md_content += "\n## Technology Stack\n\n"
+            tech_stack = architecture.get("technology_stack", {})
+            for category, techs in tech_stack.items():
+                md_content += f"### {category.title()}\n"
+                for tech in techs:
+                    md_content += f"- {tech}\n"
+                md_content += "\n"
+            await self._save_markdown_file("architecture.md", md_content)
+
             return {"status": "success", "architecture": architecture}
         except Exception as e:
             logger.error(f"Erro no parsing da resposta do Arquiteto: {str(e)}")

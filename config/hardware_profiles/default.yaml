@@ -60,6 +60,7 @@ orchestrator:
   request_timeout: 600
   recursion_limit: 15
   max_retry_attempts: 3
+  max_code_reviews_per_job: 5
 # Performance
 performance:
   batch_processing: false

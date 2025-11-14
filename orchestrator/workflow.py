@@ -232,12 +232,24 @@ class DEVsAIOrchestrator:
                 "human_intervention": "human_supervisor",
             },
         )
+
+        def check_agent8_next(state: ProjectState) -> str:
+            if not state.last_operation.get("success", True):
+                return "human_intervention"
+            if state.current_phase == "review_loop":
+                return "continue_review"
+            if state.current_phase == "project_complete":
+                return "end"
+            return "human_intervention"
+
         workflow.add_conditional_edges(
             "agent8",
-            lambda state: "end"
-            if state.last_operation.get("success", True) and state.current_phase == "project_complete"
-            else "human_intervention",
-            {"end": END, "human_intervention": "human_supervisor"},
+            check_agent8_next,
+            {
+                "end": END,
+                "continue_review": "agent7",
+                "human_intervention": "human_supervisor",
+            },
         )
 
         # Conexões de recuperação
@@ -255,6 +267,11 @@ class DEVsAIOrchestrator:
         ready = await self.llm_manager.ensure_model_ready(agent_id, model_name)
 
         if ready and state.job_id:
+            if state.current_step_id:
+                previous_step = await StepRepository.get_step(state.current_step_id)
+                if previous_step and previous_step.get("status") == "running":
+                    await StepRepository.update_step_status(state.current_step_id, "completed")
+
             step_name = f"{agent_id}_{state.current_phase}"
             step_id = await StepRepository.create_step(
                 job_id=state.job_id,
@@ -862,18 +879,33 @@ class DEVsAIOrchestrator:
                     "code_review": state.code_review,
                     "project_structure": state.project_structure,
                     "technical_tasks": state.technical_tasks,
+                    "repository_url": state.repository_url,
+                    "access_token": state.access_token,
                     "operation": "final_delivery",
                 }
             )
 
-            state.final_delivery = result.get("final_delivery")
+            if result.get("should_loop_back", False):
+                state.code_review_count += 1
+                max_reviews = self.config.get("orchestrator", {}).get("max_code_reviews_per_job", 5)
+                if state.code_review_count >= max_reviews:
+                    workflow_logger.warning(f"Limite de code reviews atingido ({max_reviews}). Finalizando job.")
+                    state.current_phase = "project_complete"
+                else:
+                    workflow_logger.info(
+                        f"Voltando para code review (tentativa {state.code_review_count}/{max_reviews})"
+                    )
+                    state.current_phase = "review_loop"
+            else:
+                state.final_delivery = result.get("final_delivery")
+                state.current_phase = "project_complete"
+
             state.last_operation = {
                 "success": True,
                 "agent": "agent8",
                 "result": result,
                 "timestamp": datetime.utcnow(),
             }
-            state.current_phase = "project_complete"
 
             execution_time = (datetime.utcnow() - start_time).total_seconds()
             docs_count = len(result.get("documentation_generated", {}))
@@ -1396,7 +1428,12 @@ class DEVsAIOrchestrator:
         return state
 
     async def execute_workflow(
-        self, user_input: str, project_path: str | None = None, job_id: str | None = None
+        self,
+        user_input: str,
+        project_path: str | None = None,
+        job_id: str | None = None,
+        repository_url: str | None = None,
+        access_token: str | None = None,
     ) -> dict[str, any]:
         """Executa o fluxo completo do DEVs AI"""
         workflow_logger.info("=== Iniciando execução do workflow DEVs AI ===")
@@ -1407,10 +1444,16 @@ class DEVsAIOrchestrator:
 
         job_uuid = UUID(job_id) if job_id else None
 
+        if project_path:
+            self.shared_context.project_state.set("project_path", project_path)
+
         initial_state = ProjectState(
             last_operation={"user_input": user_input, "success": True},
             project_path=project_path,
             job_id=job_uuid,
+            repository_url=repository_url,
+            access_token=access_token,
+            code_review_count=0,
             timestamp=datetime.utcnow(),
         )
 

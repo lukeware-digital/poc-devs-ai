@@ -34,6 +34,38 @@ class Agent7_CodeReviewer(BaseAgent):
         await self.shared_context.update_decision(self.agent_id, "quality", "code_review", review_results, 0.9)
         await self.shared_context.update_decision(self.agent_id, "quality", "quality_metrics", quality_metrics, 0.95)
 
+        # Salva code_review.md
+        md_content = "# Code Review\n\n"
+        approval_status = "✅ Approved" if self._determine_overall_approval(review_results) else "❌ Not Approved"
+        md_content += f"## Overall Approval: {approval_status}\n\n"
+        md_content += "## Quality Metrics\n\n"
+        md_content += f"- **Approval Rate:** {quality_metrics.get('approval_rate', 0):.1f}%\n"
+        md_content += f"- **Average Score:** {quality_metrics.get('average_score', 0):.2f}\n"
+        md_content += f"- **Total Issues:** {quality_metrics.get('total_issues', 0)}\n"
+        md_content += f"- **Critical Issues:** {quality_metrics.get('critical_issues', 0)}\n"
+        md_content += f"- **Quality Grade:** {quality_metrics.get('quality_grade', 'N/A')}\n\n"
+        md_content += "---\n\n"
+        for task_id, review in review_results.items():
+            md_content += f"## Review for {task_id}\n\n"
+            md_content += f"**Overall Score:** {review.get('overall_score', 0):.2f}\n"
+            md_content += f"**Approved:** {'✅ Yes' if review.get('approved', False) else '❌ No'}\n\n"
+            md_content += "### Issues Found\n\n"
+            for issue in review.get("issues_found", []):
+                issue_type = issue.get("type", "N/A")
+                severity = issue.get("severity", "N/A")
+                description = issue.get("description", "N/A")
+                md_content += f"- **{issue_type}** ({severity}) - {description}\n"
+                md_content += f"  - File: {issue.get('file', 'N/A')}:{issue.get('line', 'N/A')}\n"
+                md_content += f"  - Suggestion: {issue.get('suggestion', 'N/A')}\n"
+                md_content += f"  - Priority: {issue.get('priority', 'N/A')}\n\n"
+            md_content += "### Suggested Improvements\n\n"
+            for improvement in review.get("suggested_improvements", []):
+                md_content += f"- **{improvement.get('type', 'N/A')}**: {improvement.get('description', 'N/A')}\n"
+                md_content += f"  - Benefit: {improvement.get('benefit', 'N/A')}\n"
+                md_content += f"  - Effort: {improvement.get('effort', 'N/A')}\n\n"
+            md_content += "---\n\n"
+        await self._save_markdown_file("code_review.md", md_content)
+
         return {
             "status": "success",
             "reviews": review_results,

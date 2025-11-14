@@ -73,6 +73,25 @@ Responda em formato JSON estruturado:
                 self.agent_id, "technical", "initial_spec", task_spec.model_dump(), 0.8
             )
 
+            # Salva specification.md
+            md_content = (
+                f"# Specification\n\n## Task ID\n{task_spec.task_id}\n\n"
+                f"## Description\n{task_spec.description}\n\n## Acceptance Criteria\n"
+            )
+            for criterion in task_spec.acceptance_criteria:
+                md_content += f"- {criterion}\n"
+            md_content += f"\n## Estimated Complexity\n{task_spec.estimated_complexity}\n\n## Technical Constraints\n"
+            for constraint in task_spec.technical_constraints:
+                md_content += f"- {constraint}\n"
+            if task_spec.requirements_breakdown:
+                md_content += "\n## Requirements Breakdown\n\n### Functional\n"
+                for req in task_spec.requirements_breakdown.get("functional", []):
+                    md_content += f"- {req}\n"
+                md_content += "\n### Non-Functional\n"
+                for req in task_spec.requirements_breakdown.get("non_functional", []):
+                    md_content += f"- {req}\n"
+            await self._save_markdown_file("specification.md", md_content)
+
             return {
                 "status": "success",
                 "specification": task_spec.model_dump(),

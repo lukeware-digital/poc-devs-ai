@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+from database.step_repository import StepRepository
 from main import DEVsAISystem
 from models.job_model import JobRequest
 from services.git_service import AuthenticationError, GitService
@@ -77,7 +78,19 @@ class JobProcessor:
 
             await self.job_manager.update_job_status(job_id, current_step="Executando workflow DEVs AI", progress=40.0)
 
-            result = await self.system.process_request(job_request.user_input, project_path, job_id=str(job_id))
+            from database.job_request_repository import JobRequestRepository
+
+            job_request_data = await JobRequestRepository.get_job_request(job_id)
+            if not job_request_data:
+                raise ValueError(f"Dados da requisição não encontrados para job {job_id}")
+
+            result = await self.system.process_request(
+                job_request_data["user_input"],
+                project_path,
+                job_id=str(job_id),
+                repository_url=job_request_data["repository_url"],
+                access_token=job_request_data["access_token"],
+            )
 
             await self.job_manager.update_job_status(
                 job_id, current_step="Aguardando aprovação para commit", progress=90.0
@@ -110,12 +123,104 @@ class JobProcessor:
             )
             return {"success": False, "error": str(e)}
 
-    async def approve_commit(self, job_id: UUID, approved: bool, commit_message: str) -> dict[str, Any]:
-        if job_id not in self.approval_requests:
-            raise ValueError("Job não encontrado ou não está aguardando aprovação")
+    def _log_job_start_with_steps(self, job_id: UUID, steps: list[dict[str, Any]]):
+        """
+        Gera log grande e decorativo mostrando o job iniciado e os steps executados pelos agentes.
 
-        request_data = self.approval_requests[job_id]
-        project_path = request_data["project_path"]
+        Args:
+            job_id: ID do job
+            steps: Lista de steps executados
+        """
+        border = "═" * 70
+
+        agent_icons = {
+            "agent1": "🔍",
+            "agent2": "📋",
+            "agent3": "🏗️",
+            "agent4": "👨‍💼",
+            "agent5": "📁",
+            "agent6": "💻",
+            "agent7": "🔎",
+            "agent8": "✅",
+        }
+
+        status_icons = {
+            "pending": "⏳",
+            "running": "⚙️",
+            "completed": "✅",
+            "failed": "❌",
+        }
+
+        agent_names = {
+            "agent1": "Clarificador",
+            "agent2": "Product Manager",
+            "agent3": "Arquiteto",
+            "agent4": "Tech Lead",
+            "agent5": "Scaffolder",
+            "agent6": "Desenvolvedor",
+            "agent7": "Code Reviewer",
+            "agent8": "Finalizador",
+        }
+
+        log_message = f"""
+{border}
+🚀  JOB INICIADO - Desenvolvimento do Software
+{border}
+Job ID: {job_id}
+Total de Steps: {len(steps)}
+{border}
+"""
+
+        if steps:
+            log_message += "Steps Executados pelos Agentes:\n"
+            log_message += f"{border}\n"
+
+            for step in steps:
+                agent_id = step.get("agent_id", "unknown")
+                step_name = step.get("step_name", "N/A")
+                status = step.get("status", "unknown")
+
+                agent_icon = agent_icons.get(agent_id, "🤖")
+                status_icon = status_icons.get(status, "❓")
+                agent_name = agent_names.get(agent_id, agent_id)
+
+                started_at = step.get("started_at")
+                completed_at = step.get("completed_at")
+
+                time_info = ""
+                if started_at:
+                    time_info = f" | Iniciado: {started_at}"
+                if completed_at:
+                    time_info += f" | Concluído: {completed_at}"
+
+                log_message += f"{agent_icon} {agent_name} ({agent_id})\n"
+                log_message += f"   {status_icon} Status: {status.upper()}\n"
+                log_message += f"   📝 Step: {step_name}{time_info}\n"
+
+                if step.get("error_message"):
+                    log_message += f"   ⚠️  Erro: {step.get('error_message')}\n"
+
+                log_message += f"{border}\n"
+        else:
+            log_message += "Nenhum step encontrado para este job.\n"
+            log_message += f"{border}\n"
+
+        logger.info(log_message)
+
+    async def approve_commit(self, job_id: UUID, approved: bool, commit_message: str) -> dict[str, Any]:
+        from database.job_request_repository import JobRequestRepository
+
+        job = await self.job_manager.get_job(job_id)
+        if not job:
+            raise ValueError("Job não encontrado")
+
+        project_path = job.get("project_path")
+        if not project_path:
+            raise ValueError("Project path não encontrado para o job")
+
+        job_request_data = await JobRequestRepository.get_job_request(job_id)
+        if not job_request_data:
+            raise ValueError("Dados da requisição não encontrados para o job")
 
         if not approved:
             await self.job_manager.update_job_status(
@@ -129,12 +234,12 @@ class JobProcessor:
 
             await self.git_service.create_commit(project_path, commit_message, agent_id="agent8")
 
-            if request_data.get("repository_url"):
+            if job_request_data.get("repository_url"):
                 await self.job_manager.update_job_status(job_id, current_step="Fazendo push", progress=99.0)
                 await self.git_service.push_changes(
                     project_path,
-                    request_data["repository_url"],
-                    request_data["access_token"],
+                    job_request_data["repository_url"],
+                    job_request_data["access_token"],
                     agent_id="agent8",
                 )
 
@@ -142,7 +247,11 @@ class JobProcessor:
                 job_id, status="completed", current_step="Concluído", progress=100.0
             )
 
-            del self.approval_requests[job_id]
+            steps = await StepRepository.get_steps_by_job(job_id)
+            self._log_job_start_with_steps(job_id, steps)
+
+            if job_id in self.approval_requests:
+                del self.approval_requests[job_id]
             return {"success": True, "message": "Commit e push realizados com sucesso"}
 
         except Exception as e:

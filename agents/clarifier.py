@@ -17,36 +17,41 @@ class Agent1_Clarificador(BaseAgent):
         # Recupera contexto relevante
         rag_context = self.rag.retrieve(user_input, "requirement", 3)
 
+        # Carrega template especializado
+        template_base = self._build_prompt("clarifier", {})
+        
         prompt = f"""
-        Como Analista de Requisitos, analise a seguinte solicitação do usuário:
-        SOLICITAÇÃO: {user_input}
-        CONTEXTO RELEVANTE:
-        {json.dumps(rag_context, indent=2)}
+{template_base}
 
-        Sua tarefa é:
-        1. Clarificar requisitos ambíguos
-        2. Identificar requisitos funcionais e não-funcionais
-        3. Definir critérios de aceitação claros
-        4. Estimar complexidade (1-10)
+Analise a seguinte solicitação do usuário:
+SOLICITAÇÃO: {user_input}
+CONTEXTO RELEVANTE:
+{json.dumps(rag_context, indent=2)}
 
-        Responda em formato JSON estruturado:
-        {{
-            "requirements_breakdown": {{
-                "functional": [],
-                "non_functional": []
-            }},
-            "acceptance_criteria": [],
-            "clarification_questions": [],
-            "estimated_complexity": 0,
-            "technical_considerations": []
-        }}
-        """
+Sua tarefa é:
+1. Clarificar requisitos ambíguos
+2. Identificar requisitos funcionais e não-funcionais
+3. Definir critérios de aceitação claros
+4. Estimar complexidade (1-10)
+
+Responda em formato JSON estruturado:
+{{
+    "requirements_breakdown": {{
+        "functional": [],
+        "non_functional": []
+    }},
+    "acceptance_criteria": [],
+    "clarification_questions": [],
+    "estimated_complexity": 0,
+    "technical_considerations": []
+}}
+"""
 
         # Obtém temperatura do config para este agente (com valor padrão)
         agent_config = getattr(self.shared_context, "config", {})
         temperature = agent_config.get("agents", {}).get("agent1", {}).get("temperature", 0.3)
 
-        response = await self.llm.generate_response(prompt, temperature=temperature)
+        response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
             spec = json.loads(response)

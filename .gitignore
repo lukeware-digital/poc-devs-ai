@@ -209,3 +209,7 @@ __marimo__/
 
 # ChromaDB
 chroma_data/
+
+.locks
+backups
+logs

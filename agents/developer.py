@@ -55,59 +55,53 @@ class Agent6_Desenvolvedor(BaseAgent):
         temperature: float,
     ) -> dict[str, any]:
         """Implementa uma única task técnica"""
+        # Carrega template especializado
+        template_base = self._build_prompt("developer", {})
+        
         prompt = f"""
-        Como Desenvolvedor Sênior, implemente a seguinte task:
-        TASK: {json.dumps(task, indent=2)}
-        ESTRUTURA DO PROJETO: {json.dumps(project_structure, indent=2)}
-        ARQUITETURA: {json.dumps(architecture, indent=2)}
+{template_base}
 
-        Requisitos:
-        1. Gere código limpo e bem estruturado
-        2. Siga padrões da arquitetura definida
-        3. Inclua tratamentos de erro adequados
-        4. Adicione comentários quando necessário
-        5. Considere os critérios de aceitação
-        6. Siga as convenções da linguagem/stack
+Implemente a seguinte task:
+TASK: {json.dumps(task, indent=2)}
+ESTRUTURA DO PROJETO: {json.dumps(project_structure, indent=2)}
+ARQUITETURA: {json.dumps(architecture, indent=2)}
 
-        Para tasks de backend (Python):
-        - Use type hints
-        - Siga PEP8
-        - Inclua docstrings
-        - Trate exceções adequadamente
+Requisitos:
+1. Gere código limpo e bem estruturado
+2. Siga padrões da arquitetura definida
+3. Inclua tratamentos de erro adequados
+4. Adicione comentários quando necessário
+5. Considere os critérios de aceitação
+6. Siga as convenções da linguagem/stack
 
-        Para tasks de frontend:
-        - Use componentes reutilizáveis
-        - Trate estados de loading/error
-        - Siga padrões de acessibilidade
-
-        RESPOSTA EM JSON:
+RESPOSTA EM JSON:
+{{
+    "task_id": "{task["task_id"]}",
+    "files_created_modified": [
         {{
-            "task_id": "{task["task_id"]}",
-            "files_created_modified": [
-                {{
-                    "file_path": "src/main.py",
-                    "content": "código completo aqui",
-                    "action": "create|modify",
-                    "description": "Descrição das mudanças"
-                }}
-            ],
-            "dependencies_added": [],
-            "tests_suggested": [
-                {{
-                    "test_file": "test_main.py",
-                    "test_cases": []
-                }}
-            ],
-            "implementation_notes": "Notas sobre decisões de implementação",
-            "quality_metrics": {{
-                "complexity": "low|medium|high",
-                "maintainability": "high",
-                "security_considerations": []
-            }}
+            "file_path": "src/main.py",
+            "content": "código completo aqui",
+            "action": "create|modify",
+            "description": "Descrição das mudanças"
         }}
-        """
+    ],
+    "dependencies_added": [],
+    "tests_suggested": [
+        {{
+            "test_file": "test_main.py",
+            "test_cases": []
+        }}
+    ],
+    "implementation_notes": "Notas sobre decisões de implementação",
+    "quality_metrics": {{
+        "complexity": "low|medium|high",
+        "maintainability": "high",
+        "security_considerations": []
+    }}
+}}
+"""
 
-        response = await self.llm.generate_response(prompt, temperature=temperature)
+        response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
             implementation = json.loads(response)

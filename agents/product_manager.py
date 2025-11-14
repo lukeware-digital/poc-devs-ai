@@ -12,41 +12,46 @@ class Agent2_ProductManager(BaseAgent):
     async def _execute_task(self, task: dict[str, any]) -> dict[str, any]:
         specification = task["specification"]
 
+        # Carrega template especializado
+        template_base = self._build_prompt("product_manager", {})
+        
         prompt = f"""
-        Como Product Manager, crie histórias de usuário baseado na especificação:
-        ESPECIFICAÇÃO: {json.dumps(specification, indent=2)}
+{template_base}
 
-        Crie:
-        1. Histórias de usuário no formato "Como [persona], eu quero [ação] para [benefício]"
-        2. Critérios de aceitação para cada história
-        3. Priorização baseada no valor e complexidade
-        4. Definição de pronto para cada história
+Crie histórias de usuário baseado na especificação:
+ESPECIFICAÇÃO: {json.dumps(specification, indent=2)}
 
-        Formato de resposta JSON:
+Crie:
+1. Histórias de usuário no formato "Como [persona], eu quero [ação] para [benefício]"
+2. Critérios de aceitação para cada história
+3. Priorização baseada no valor e complexidade
+4. Definição de pronto para cada história
+
+Formato de resposta JSON:
+{{
+    "user_stories": [
         {{
-            "user_stories": [
-                {{
-                    "id": "US-1",
-                    "description": "Como usuário, eu quero...",
-                    "acceptance_criteria": [],
-                    "priority": "high|medium|low",
-                    "definition_of_done": [],
-                    "estimated_story_points": 0
-                }}
-            ],
-            "product_backlog": [],
-            "release_planning": {{
-                "mvp_scope": [],
-                "future_enhancements": []
-            }}
+            "id": "US-1",
+            "description": "Como usuário, eu quero...",
+            "acceptance_criteria": [],
+            "priority": "high|medium|low",
+            "definition_of_done": [],
+            "estimated_story_points": 0
         }}
-        """
+    ],
+    "product_backlog": [],
+    "release_planning": {{
+        "mvp_scope": [],
+        "future_enhancements": []
+    }}
+}}
+"""
 
         # Obtém temperatura do config para este agente
         agent_config = getattr(self.shared_context, "config", {})
         temperature = agent_config.get("agents", {}).get("agent2", {}).get("temperature", 0.8)
 
-        response = await self.llm.generate_response(prompt, temperature=temperature)
+        response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
             user_stories = json.loads(response)

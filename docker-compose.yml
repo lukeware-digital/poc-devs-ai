@@ -1,7 +1,7 @@
 services:
   redis-stack:
     image: redis/redis-stack:latest
-    restart: unless-stopped
+    restart: no
     ports:
       - "8001:8001"
       - "6379:6379"
@@ -10,7 +10,7 @@ services:
 
   chromadb:
     image: chromadb/chroma:0.6.3
-    restart: unless-stopped
+    restart: no
     ports:
       - "8000:8000"
     environment:
@@ -23,7 +23,7 @@ services:
 
   postgres:
     image: postgres:alpine
-    restart: unless-stopped
+    restart: no
     environment:
       POSTGRES_DB: minha_base
       POSTGRES_USER: usuario
@@ -37,7 +37,7 @@ services:
 
   postgres-web:
     image: sosedoff/pgweb:latest
-    restart: unless-stopped
+    restart: no
     ports:
       - "8081:8081"
     environment:
@@ -50,27 +50,27 @@ services:
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
+    restart: no
     ports:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
     networks:
       - db_net
-    restart: unless-stopped
-    entrypoint: >
-      sh -c "
-      ollama serve &
-      sleep 2 &&
-      ollama pull llama3:8b-instruct-q4_0 &&
-      ollama pull mistral:7b-instruct-v0.2-q4_0 &&
-      ollama pull phi3:medium-4k-instruct-q4_0 &&
-      ollama pull codegemma:7b-instruct-q4_0
-      "
+    # entrypoint: >
+    #   sh -c "
+    #   ollama serve &
+    #   sleep 2 &&
+    #   ollama pull llama3:8b-instruct-q4_0 &&
+    #   ollama pull mistral:7b-instruct-v0.2-q4_0 &&
+    #   ollama pull phi3:medium-4k-instruct-q4_0 &&
+    #   ollama pull codegemma:7b-instruct-q4_0
+    #   "
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: open-webui
-    restart: unless-stopped
+    restart: no
     ports:
       - "8383:8080"
     environment:
@@ -106,7 +106,7 @@ services:
       - chromadb
       - postgres
       - redis-stack
-    restart: unless-stopped
+    restart: no
 
 volumes:
   open-webui-data:

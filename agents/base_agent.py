@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import any
+from typing import Dict, Optional
 
 logger = logging.getLogger("DEVs_AI")
 
@@ -30,6 +30,7 @@ class BaseAgent:
             "total_response_time": 0.0,
             "last_execution": None,
         }
+        self._prompt_loader = None
 
     async def execute(self, task: dict[str, any]) -> dict[str, any]:
         """
@@ -63,7 +64,25 @@ class BaseAgent:
         """
         Método abstrato para ser implementado por cada agente específico.
         """
-        raise NotImplementedError("Método deve ser implementado pela subclasse") from e
+        raise NotImplementedError("Método deve ser implementado pela subclasse")
+
+    async def _generate_llm_response(
+        self,
+        prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 2048,
+        stop_sequences: list[str] = None,
+    ) -> str:
+        """
+        Helper method para gerar resposta LLM com agent_id automaticamente.
+        """
+        return await self.llm.generate_response(
+            prompt=prompt,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stop_sequences=stop_sequences,
+            agent_id=self.agent_id,
+        )
 
     def get_metrics(self) -> dict[str, any]:
         """
@@ -84,3 +103,34 @@ class BaseAgent:
             "total_operations": total_operations,
             "last_execution": self.metrics["last_execution"],
         }
+
+    def _get_language_config(self) -> Dict:
+        """
+        Obtém a configuração de especialização de linguagem.
+        """
+        config = getattr(self.shared_context, "config", {})
+        return config.get("language_specialization", {})
+
+    def _get_prompt_loader(self):
+        """
+        Obtém ou cria o carregador de prompts.
+        """
+        if self._prompt_loader is None:
+            from utils.prompt_loader import PromptLoader
+            config = getattr(self.shared_context, "config", {})
+            self._prompt_loader = PromptLoader(config)
+        return self._prompt_loader
+
+    def _build_prompt(self, template_name: str, context: Dict) -> str:
+        """
+        Constrói um prompt usando templates parametrizados.
+        
+        Args:
+            template_name: Nome da seção do template (ex: 'developer', 'architect')
+            context: Dicionário com valores adicionais para substituição no template
+            
+        Returns:
+            Prompt formatado com placeholders substituídos
+        """
+        prompt_loader = self._get_prompt_loader()
+        return prompt_loader.build_prompt(template_name, context)

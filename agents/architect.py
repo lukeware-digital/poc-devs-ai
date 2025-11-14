@@ -16,57 +16,62 @@ class Agent3_Arquiteto(BaseAgent):
         # Recupera padrões arquiteturais relevantes
         arch_context = self.rag.retrieve(spec["description"], "architecture", 5)
 
+        # Carrega template especializado
+        template_base = self._build_prompt("architect", {})
+        
         prompt = f"""
-        Como Arquiteto de Software, defina a arquitetura para:
-        ESPECIFICAÇÃO: {json.dumps(spec, indent=2)}
-        HISTÓRIAS: {json.dumps(user_stories, indent=2)}
-        CONTEXTO ARQUITETURAL:
-        {json.dumps(arch_context, indent=2)}
+{template_base}
 
-        Defina:
-        1. Padrão arquitetural principal (microservices, monolith, serverless, etc.)
-        2. Componentes principais e suas responsabilidades
-        3. Tecnologias recomendadas (frontend, backend, database, etc.)
-        4. Protocolos de comunicação entre componentes
-        5. Considerações de escalabilidade, segurança e manutenção
-        6. Diagrama de componentes em texto (para PlantUML)
+Defina a arquitetura para:
+ESPECIFICAÇÃO: {json.dumps(spec, indent=2)}
+HISTÓRIAS: {json.dumps(user_stories, indent=2)}
+CONTEXTO ARQUITETURAL:
+{json.dumps(arch_context, indent=2)}
 
-        Formato JSON:
+Defina:
+1. Padrão arquitetural principal (microservices, monolith, serverless, etc.)
+2. Componentes principais e suas responsabilidades
+3. Tecnologias recomendadas (frontend, backend, database, etc.)
+4. Protocolos de comunicação entre componentes
+5. Considerações de escalabilidade, segurança e manutenção
+6. Diagrama de componentes em texto (para PlantUML)
+
+Formato JSON:
+{{
+    "architecture_decision": {{
+        "pattern": "",
+        "rationale": "",
+        "alternatives_considered": []
+    }},
+    "components": [
         {{
-            "architecture_decision": {{
-                "pattern": "",
-                "rationale": "",
-                "alternatives_considered": []
-            }},
-            "components": [
-                {{
-                    "name": "",
-                    "responsibility": "",
-                    "technology": "",
-                    "dependencies": []
-                }}
-            ],
-            "technology_stack": {{
-                "frontend": [],
-                "backend": [],
-                "database": [],
-                "infrastructure": []
-            }},
-            "communication_protocols": [],
-            "quality_attributes": {{
-                "scalability": "",
-                "security": "",
-                "maintainability": ""
-            }},
-            "plantuml_diagram": ""
+            "name": "",
+            "responsibility": "",
+            "technology": "",
+            "dependencies": []
         }}
-        """
+    ],
+    "technology_stack": {{
+        "frontend": [],
+        "backend": [],
+        "database": [],
+        "infrastructure": []
+    }},
+    "communication_protocols": [],
+    "quality_attributes": {{
+        "scalability": "",
+        "security": "",
+        "maintainability": ""
+    }},
+    "plantuml_diagram": ""
+}}
+"""
 
         # Obtém temperatura do config para este agente
         agent_config = getattr(self.shared_context, "config", {})
         temperature = agent_config.get("agents", {}).get("agent3", {}).get("temperature", 0.2)
 
-        response = await self.llm.generate_response(prompt, temperature=temperature)
+        response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
             architecture = json.loads(response)

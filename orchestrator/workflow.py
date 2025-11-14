@@ -5,8 +5,6 @@ Sistema de orquestração do fluxo de trabalho usando LangGraph
 import logging
 from datetime import datetime
 
-from pydantic import BaseModel, Field
-
 from agents.architect import Agent3_Arquiteto
 from agents.clarifier import Agent1_Clarificador
 from agents.code_reviewer import Agent7_CodeReviewer
@@ -18,33 +16,11 @@ from agents.tech_lead import Agent4_TechLead
 from guardrails.security_system import GuardrailSystem
 from monitoring.metrics_collector import MetricsCollector
 from orchestrator.fallback_handler import FallbackHandler
+from orchestrator.models import ProjectState
 from rag.retriever import RAGRetriever
 from shared_context.context_manager import SharedContext
 
 logger = logging.getLogger("DEVs_AI")
-
-
-class ProjectState(BaseModel):
-    """
-    Estado do projeto durante o workflow
-    """
-
-    current_phase: str = "initial"
-    task_specification: dict[str, any | None] = None
-    user_stories: dict[str, any | None] = None
-    architecture: dict[str, any | None] = None
-    technical_tasks: dict[str, any | None] = None
-    project_structure: dict[str, any | None] = None
-    implemented_code: dict[str, any | None] = None
-    code_review: dict[str, any | None] = None
-    final_delivery: dict[str, any | None] = None
-    last_operation: dict[str, any] = {}
-    failure_count: int = 0
-    recovery_attempts: int = 0
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class DEVsAIOrchestrator:
@@ -54,7 +30,7 @@ class DEVsAIOrchestrator:
 
     def __init__(self, config: dict[str, any]):
         self.config = config
-        self.shared_context = SharedContext()
+        self.shared_context = SharedContext(config)
         self.metrics_collector = MetricsCollector(config)
         self.fallback_handler = FallbackHandler(self.shared_context)
         self.setup_components()
@@ -1115,7 +1091,7 @@ class DEVsAIOrchestrator:
 
         try:
             # Executa o workflow
-            final_state = await self.workflow.arun(initial_state)
+            final_state = await self.workflow.ainvoke(initial_state)
 
             # Calcula métricas finais
             execution_time = (datetime.utcnow() - initial_state.timestamp).total_seconds()

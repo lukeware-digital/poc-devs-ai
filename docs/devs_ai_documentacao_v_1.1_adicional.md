@@ -88,8 +88,8 @@ Para a versão 1.1 (com Agent-3 e RAG avançado), você ainda conseguirá rodar,
 # Perfil de Configuração Otimizado - Ryzen 5800X + RTX 3060 Ti
 
 ```yaml
-# config/hardware_profiles/ryzen5800x_rtx3060ti.yaml
-hardware_profile: "ryzen5800x_rtx3060ti"
+# config/hardware_profiles/default.yaml
+hardware_profile: "default"
 description: "Perfil otimizado para AMD Ryzen 5800X + NVIDIA RTX 3060 Ti (8GB VRAM) + 32GB RAM"
 
 # === CONFIGURAÇÕES DE MODELOS LLM ===
@@ -384,7 +384,7 @@ start_services() {
     
     # Iniciar com nice e ionice para prioridade otimizada
     nice -n 10 ionice -c 2 -n 7 python -m devs_ai.orchestrator \
-        --config config/hardware_profiles/ryzen5800x_rtx3060ti.yaml \
+        --config config/hardware_profiles/default.yaml \
         --max-agents 3 \
         --gpu-layers 35 &
 }
@@ -441,7 +441,7 @@ main
 ./scripts/system_status.sh
 
 # Otimizar cache para seu hardware
-./scripts/optimize_cache.sh --profile ryzen5800x_rtx3060ti
+./scripts/optimize_cache.sh --profile default
 
 # Limpar cache quando a performance cair
 ./scripts/clear_cache.sh

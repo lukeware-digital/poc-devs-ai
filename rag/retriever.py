@@ -15,20 +15,28 @@ class RAGRetriever:
     Recuperador de contexto para auxiliar na geração de respostas com conhecimento especializado
     """
 
-    def __init__(self, chroma_client: chromadb.Client, embedders: dict[str, any]):
+    def __init__(self, chroma_client: chromadb.Client, embedders: dict[str, object]):
         self.chroma_client = chroma_client
         self.semantic_embedder = embedders["semantic"]
         self.technical_embedder = embedders["technical"]
         self.context_embedder = embedders["contextual"]
 
-        # Obtém referências às coleções
-        self.collections = {
-            "code": self.chroma_client.get_collection("code_documents"),
-            "architecture": self.chroma_client.get_collection("architecture_documents"),
-            "requirement": self.chroma_client.get_collection("requirement_documents"),
-            "commit": self.chroma_client.get_collection("commit_documents"),
-            "generic": self.chroma_client.get_collection("generic_documents"),
+        # Cria ou obtém referências às coleções
+        collection_names = {
+            "code": "code_documents",
+            "architecture": "architecture_documents",
+            "requirement": "requirement_documents",
+            "commit": "commit_documents",
+            "generic": "generic_documents",
         }
+        
+        self.collections = {}
+        for key, name in collection_names.items():
+            try:
+                self.collections[key] = self.chroma_client.get_collection(name=name)
+            except Exception:
+                logger.debug(f"Collection {name} não existe ainda, será criada pelo RAGIndexer quando necessário")
+                self.collections[key] = None
 
         logger.info("✅ RAGRetriever inicializado com sucesso")
 
@@ -38,7 +46,7 @@ class RAGRetriever:
         doc_type: str = None,
         n_results: int = 5,
         min_similarity: float = 0.3,
-    ) -> list[dict[str, any]]:
+    ) -> list[dict[str, object]]:
         """
         Recupera documentos relevantes para uma consulta
 
@@ -54,10 +62,10 @@ class RAGRetriever:
         try:
             # Determina coleções a pesquisar
             collections_to_search = []
-            if doc_type and doc_type in self.collections:
+            if doc_type and doc_type in self.collections and self.collections[doc_type] is not None:
                 collections_to_search = [self.collections[doc_type]]
             else:
-                collections_to_search = list(self.collections.values())
+                collections_to_search = [col for col in self.collections.values() if col is not None]
 
             # Gera embedding da consulta
             query_embedding = self.semantic_embedder.embed(query)
@@ -98,7 +106,7 @@ class RAGRetriever:
 
     def retrieve_by_semantic_similarity(
         self, query: str, context_type: str, n_results: int = 3
-    ) -> list[dict[str, any]]:
+    ) -> list[dict[str, object]]:
         """
         Recupera documentos por similaridade semântica para um tipo específico de contexto
 
@@ -135,7 +143,7 @@ class RAGRetriever:
 
         return unique_results[:n_results]
 
-    def _format_collection_results(self, results: dict[str, any], collection_name: str) -> list[dict[str, any]]:
+    def _format_collection_results(self, results: dict[str, object], collection_name: str) -> list[dict[str, object]]:
         """
         Formata resultados de uma coleção para formato consistente
         """
@@ -172,7 +180,7 @@ class RAGRetriever:
 
         return formatted_results
 
-    def _remove_duplicate_results(self, results: list[dict[str, any]]) -> list[dict[str, any]]:
+    def _remove_duplicate_results(self, results: list[dict[str, object]]) -> list[dict[str, object]]:
         """
         Remove resultados duplicados mantendo o mais relevante
         """
@@ -195,7 +203,7 @@ class RAGRetriever:
         keyword_query: str = None,
         doc_type: str = None,
         n_results: int = 5,
-    ) -> list[dict[str, any]]:
+    ) -> list[dict[str, object]]:
         """
         Recupera documentos usando busca híbrida (semântica + keywords)
 

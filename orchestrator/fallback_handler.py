@@ -5,7 +5,7 @@ FallbackHandler - Sistema centralizado de fallback para todos os agentes
 import logging
 from datetime import datetime
 
-from orchestrator.workflow import ProjectState
+from orchestrator.models import ProjectState
 
 logger = logging.getLogger("DEVs_AI")
 
@@ -17,7 +17,7 @@ class FallbackHandler:
         self.shared_context = shared_context
         self.fallback_templates = self._init_fallback_templates()
 
-    def _init_fallback_templates(self) -> dict[str, dict[str, any]]:
+    def _init_fallback_templates(self) -> dict[str, dict[str, object]]:
         """Define templates de fallback para cada tipo de agente"""
         return {
             "agent1": {
@@ -288,7 +288,7 @@ class FallbackHandler:
 
         return state
 
-    def _customize_fallback(self, state: ProjectState, agent_id: str, fallback_data: dict[str, any]) -> dict[str, any]:
+    def _customize_fallback(self, state: ProjectState, agent_id: str, fallback_data: dict[str, object]) -> dict[str, object]:
         """Customiza dados de fallback com informações do estado"""
         if agent_id == "agent1" and state.last_operation.get("user_input"):
             fallback_data["description"] = state.last_operation["user_input"]
@@ -297,7 +297,7 @@ class FallbackHandler:
 
         return fallback_data
 
-    def _update_project_state(self, state: ProjectState, agent_id: str, fallback_data: dict[str, any]):
+    def _update_project_state(self, state: ProjectState, agent_id: str, fallback_data: dict[str, object]):
         """Atualiza o estado do projeto com dados de fallback"""
         if agent_id == "agent1":
             state.task_specification = fallback_data

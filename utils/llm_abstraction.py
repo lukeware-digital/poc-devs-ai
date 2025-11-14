@@ -288,8 +288,10 @@ class LLMAbstractLayer:
     def __init__(self, config: dict[str, any]):
         self.config = config
         self.providers = self._initialize_providers()
-        self.cache = ResponseCache(ttl_seconds=config.get("cache_ttl", 3600))
+        cache_ttl = config.get("performance", {}).get("cache_ttl", 3600)
+        self.cache = ResponseCache(ttl_seconds=cache_ttl)
         self.current_provider_idx = 0
+        self.agent_providers = {}
 
         # Carrega capability tokens se disponível
         self.capability_tokens = config.get("capability_tokens", {})
@@ -328,6 +330,33 @@ class LLMAbstractLayer:
 
         return providers
 
+    def _get_providers_for_agent(self, agent_id: str = None) -> list[LLMProvider]:
+        """Retorna providers específicos para um agente ou providers padrão"""
+        if not agent_id:
+            return self.providers
+
+        if agent_id in self.agent_providers:
+            return self.agent_providers[agent_id]
+
+        agent_models = self.config.get("agent_models", {})
+        if agent_id in agent_models:
+            model_name = agent_models[agent_id]
+            ollama_config = self.config.get("ollama", {})
+            host = ollama_config.get("host", "localhost:11434")
+            
+            providers = [OllamaProvider(model_name=model_name, host=host)]
+            
+            fallback_models = self.config.get("fallback_models", [])
+            for fallback_model in fallback_models:
+                if fallback_model != model_name:
+                    providers.append(OllamaProvider(model_name=fallback_model, host=host))
+            
+            self.agent_providers[agent_id] = providers
+            logger.info(f"Providers específicos criados para {agent_id}: {model_name}")
+            return providers
+
+        return self.providers
+
     async def generate_response(
         self,
         prompt: str,
@@ -335,6 +364,7 @@ class LLMAbstractLayer:
         max_tokens: int = 2048,
         stop_sequences: list[str] = None,
         context: dict[str, any] = None,
+        agent_id: str = None,
     ) -> str:
         """
         Gera resposta usando o provedor atual com fallback automático
@@ -345,22 +375,27 @@ class LLMAbstractLayer:
             max_tokens: Número máximo de tokens na resposta
             stop_sequences: Sequências de parada
             context: Contexto adicional para cache e logging
+            agent_id: ID do agente para usar modelo específico
 
         Returns:
             Resposta gerada
         """
+        providers = self._get_providers_for_agent(agent_id)
+        
+        if agent_id and agent_id in self.config.get("performance", {}).get("max_tokens", {}):
+            max_tokens = self.config["performance"]["max_tokens"][agent_id]
+
         # Verifica cache primeiro
-        cache_key = f"{self.providers[self.current_provider_idx].get_model_info()['name']}_{temperature}_{max_tokens}"
-        cached_response = self.cache.get(prompt, temperature, max_tokens, cache_key)
+        model_name = providers[0].get_model_info()['name']
+        cached_response = self.cache.get(prompt, temperature, max_tokens, model_name)
         if cached_response:
             logger.info("Cache hit para resposta LLM")
             return cached_response
 
         # Tenta com provedores em ordem
         last_error = None
-        for i in range(len(self.providers)):
-            provider_idx = (self.current_provider_idx + i) % len(self.providers)
-            provider = self.providers[provider_idx]
+        for i in range(len(providers)):
+            provider = providers[i]
 
             try:
                 start_time = time.time()
@@ -372,15 +407,11 @@ class LLMAbstractLayer:
                 )
                 generation_time = time.time() - start_time
 
-                # Atualiza provedor atual se bem-sucedido
-                self.current_provider_idx = provider_idx
-
                 # Armazena no cache
                 model_info = provider.get_model_info()
-                cache_key = f"{model_info['name']}_{temperature}_{max_tokens}"
-                self.cache.set(prompt, temperature, max_tokens, cache_key, response)
+                self.cache.set(prompt, temperature, max_tokens, model_info['name'], response)
 
-                logger.info(f"Resposta gerada com {model_info['name']} em {generation_time:.2f}s")
+                logger.info(f"Resposta gerada com {model_info['name']} (agent: {agent_id or 'default'}) em {generation_time:.2f}s")
                 return response
 
             except Exception as e:
@@ -393,7 +424,7 @@ class LLMAbstractLayer:
         raise Exception(f"Falha crítica nos provedores de LLM: {str(last_error)}")
 
     async def batch_generate_responses(
-        self, prompts: list[str], temperature: float = 0.7, max_tokens: int = 2048
+        self, prompts: list[str], temperature: float = 0.7, max_tokens: int = 2048, agent_id: str = None
     ) -> list[str]:
         """
         Gera respostas para múltiplos prompts em paralelo
@@ -402,11 +433,12 @@ class LLMAbstractLayer:
             prompts: Lista de prompts
             temperature: Temperatura para sampling
             max_tokens: Número máximo de tokens por resposta
+            agent_id: ID do agente para usar modelo específico
 
         Returns:
             Lista de respostas
         """
-        tasks = [self.generate_response(prompt, temperature, max_tokens) for prompt in prompts]
+        tasks = [self.generate_response(prompt, temperature, max_tokens, agent_id=agent_id) for prompt in prompts]
         return await asyncio.gather(*tasks)
 
     def get_system_status(self) -> dict[str, any]:

@@ -10,12 +10,22 @@ def load_configuration(config_path: str = None) -> dict:
     """
     # Configuração padrão
     default_config = {
-        "primary_model": "llama3:8b-instruct-q4_0",
+        "primary_model": "phi3:mini",
         "fallback_models": [
-            "mistral:7b-instruct-v0.2-q4_0",
-            "phi3:medium-4k-instruct-q4_0",
-            "codegemma:7b-instruct-q4_0",
+            "tinyllama",
+            "qwen2:1.5b-instruct-q4_K_M",
+            "gemma:2b",
         ],
+        "agent_models": {
+            "agent1": "phi3:mini",
+            "agent2": "qwen2:1.5b-instruct-q4_K_M",
+            "agent3": "phi3:mini",
+            "agent4": "llama3.2:3b",
+            "agent5": "gemma:2b",
+            "agent6": "llama3.2:3b",
+            "agent7": "phi3:mini",
+            "agent8": "qwen2:1.5b-instruct-q4_K_M",
+        },
         "redis_host": "localhost",
         "redis_port": 6379,
         "chroma_host": "localhost",
@@ -42,12 +52,38 @@ def load_configuration(config_path: str = None) -> dict:
             "gpu_offloading": True,
             "max_startup_time": 120,
             "memory_management": {"swap_usage_limit": 0.5, "gc_interval": 300},
+            "cache_ttl": 7200,
+            "max_tokens": {
+                "agent1": 2048,
+                "agent2": 2048,
+                "agent3": 4096,
+                "agent4": 2048,
+                "agent5": 2048,
+                "agent6": 4096,
+                "agent7": 4096,
+                "agent8": 2048,
+            },
         },
         "security": {
             "enable_guardrails": True,
             "capability_token_ttl": 300,
             "sandbox_enabled": True,
             "network_isolation": True,
+        },
+        "language_specialization": {
+            "language": "python",
+            "version": "3.12+",
+            "conventions": {
+                "style_guide": "PEP8",
+                "type_hints": True,
+                "docstring_format": "google",
+            },
+            "tools": {
+                "linter": "ruff|black",
+                "formatter": "black",
+                "test_framework": "pytest",
+            },
+            "specific_guidelines": [],
         },
     }
 

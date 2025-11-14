@@ -22,65 +22,70 @@ class Agent5_Scaffolder(BaseAgent):
             )
             capability_token = token.token_id
 
+        # Carrega template especializado
+        template_base = self._build_prompt("scaffolder", {})
+        
         prompt = f"""
-        Como Scaffolder, crie a estrutura completa do projeto baseado em:
-        ARQUITETURA: {json.dumps(architecture, indent=2)}
-        TASKS TÉCNICAS: {json.dumps(technical_tasks, indent=2)}
+{template_base}
 
-        Suas responsabilidades:
-        1. Criar estrutura de diretórios completa
-        2. Gerar arquivos de configuração básicos
-        3. Configurar ambiente de desenvolvimento
-        4. Setup de ferramentas (linting, testing, build)
-        5. Documentação inicial do projeto
-        6. Scripts de inicialização
+Crie a estrutura completa do projeto baseado em:
+ARQUITETURA: {json.dumps(architecture, indent=2)}
+TASKS TÉCNICAS: {json.dumps(technical_tasks, indent=2)}
 
-        ESTRUTURA ESPERADA (formato JSON):
+Suas responsabilidades:
+1. Criar estrutura de diretórios completa
+2. Gerar arquivos de configuração básicos
+3. Configurar ambiente de desenvolvimento
+4. Setup de ferramentas (linting, testing, build)
+5. Documentação inicial do projeto
+6. Scripts de inicialização
+
+ESTRUTURA ESPERADA (formato JSON):
+{{
+    "project_structure": [
         {{
-            "project_structure": [
-                {{
-                    "type": "directory|file",
-                    "path": "src/models/",
-                    "name": "__init__.py",
-                    "content": "# File content or null for directories",
-                    "template_type": "python_package|config_file|readme|dockerfile",
-                    "permissions": "644|755",
-                    "description": "Purpose of this file/directory"
-                }}
-            ],
-            "configuration_files": [
-                {{
-                    "file_path": "requirements.txt",
-                    "content": "fastapi\\nuvicorn\\nsqlalchemy",
-                    "description": "Python dependencies"
-                }}
-            ],
-            "setup_scripts": [
-                {{
-                    "name": "setup.sh",
-                    "content": "#!/bin/bash\\n pip install -r requirements.txt",
-                    "description": "Initial setup script"
-                }}
-            ],
-            "development_tools": {{
-                "linter_config": {{}},
-                "formatter_config": {{}},
-                "test_runner_config": {{}},
-                "build_tools": []
-            }},
-            "documentation": {{
-                "readme_content": "# Project Name\\n## Description",
-                "api_docs_structure": [],
-                "deployment_guide": ""
-            }}
+            "type": "directory|file",
+            "path": "src/models/",
+            "name": "__init__.py",
+            "content": "# File content or null for directories",
+            "template_type": "python_package|config_file|readme|dockerfile",
+            "permissions": "644|755",
+            "description": "Purpose of this file/directory"
         }}
-        """
+    ],
+    "configuration_files": [
+        {{
+            "file_path": "requirements.txt",
+            "content": "fastapi\\nuvicorn\\nsqlalchemy",
+            "description": "Python dependencies"
+        }}
+    ],
+    "setup_scripts": [
+        {{
+            "name": "setup.sh",
+            "content": "#!/bin/bash\\n pip install -r requirements.txt",
+            "description": "Initial setup script"
+        }}
+    ],
+    "development_tools": {{
+        "linter_config": {{}},
+        "formatter_config": {{}},
+        "test_runner_config": {{}},
+        "build_tools": []
+    }},
+    "documentation": {{
+        "readme_content": "# Project Name\\n## Description",
+        "api_docs_structure": [],
+        "deployment_guide": ""
+    }}
+}}
+"""
 
         # Obtém temperatura do config para este agente
         agent_config = getattr(self.shared_context, "config", {})
         temperature = agent_config.get("agents", {}).get("agent5", {}).get("temperature", 0.2)
 
-        response = await self.llm.generate_response(prompt, temperature=temperature)
+        response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
             project_structure = json.loads(response)

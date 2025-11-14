@@ -57,87 +57,92 @@ class Agent7_CodeReviewer(BaseAgent):
                 task_spec = t
                 break
 
+        # Carrega template especializado
+        template_base = self._build_prompt("code_reviewer", {})
+        
         prompt = f"""
-        Como Code Reviewer Sênior, analise a implementação:
-        TASK ESPECIFICAÇÃO: {json.dumps(task_spec, indent=2)}
-        IMPLEMENTAÇÃO: {json.dumps(implementation, indent=2)}
-        PADRÕES ARQUITETURAIS: {json.dumps(architecture, indent=2)}
+{template_base}
 
-        Análise a ser realizada:
-        1. QUALIDADE DE CÓDIGO:
-           - Legibilidade e clareza
-           - Complexidade ciclomática
-           - Duplicação de código
-           - Convenções de nomenclatura
-        2. ADERÊNCIA AOS REQUISITOS:
-           - Critérios de aceitação atendidos
-           - Funcionalidade completa
-           - Comportamento esperado
-        3. SEGURANÇA:
-           - Vulnerabilidades potenciais
-           - Tratamento de dados sensíveis
-           - Validação de entrada
-        4. PERFORMANCE:
-           - Algoritmos eficientes
-           - Uso adequado de recursos
-           - Possíveis gargalos
-        5. MANTENABILIDADE:
-           - Modularidade
-           - Testabilidade
-           - Documentação
-        6. PADRÕES ARQUITETURAIS:
-           - Seguimento dos padrões definidos
-           - Acoplamento e coesão
-           - Separação de responsabilidades
+Analise a implementação:
+TASK ESPECIFICAÇÃO: {json.dumps(task_spec, indent=2)}
+IMPLEMENTAÇÃO: {json.dumps(implementation, indent=2)}
+PADRÕES ARQUITETURAIS: {json.dumps(architecture, indent=2)}
 
-        RESPOSTA EM JSON:
+Análise a ser realizada:
+1. QUALIDADE DE CÓDIGO:
+   - Legibilidade e clareza
+   - Complexidade ciclomática
+   - Duplicação de código
+   - Convenções de nomenclatura
+2. ADERÊNCIA AOS REQUISITOS:
+   - Critérios de aceitação atendidos
+   - Funcionalidade completa
+   - Comportamento esperado
+3. SEGURANÇA:
+   - Vulnerabilidades potenciais
+   - Tratamento de dados sensíveis
+   - Validação de entrada
+4. PERFORMANCE:
+   - Algoritmos eficientes
+   - Uso adequado de recursos
+   - Possíveis gargalos
+5. MANTENABILIDADE:
+   - Modularidade
+   - Testabilidade
+   - Documentação
+6. PADRÕES ARQUITETURAIS:
+   - Seguimento dos padrões definidos
+   - Acoplamento e coesão
+   - Separação de responsabilidades
+
+RESPOSTA EM JSON:
+{{
+    "task_id": "{task_id}",
+    "overall_score": 0.0,
+    "approved": false,
+    "issues_found": [
         {{
-            "task_id": "{task_id}",
-            "overall_score": 0.0,
-            "approved": false,
-            "issues_found": [
-                {{
-                    "type": "bug|security|performance|maintainability|style",
-                    "severity": "low|medium|high|critical",
-                    "file": "src/main.py",
-                    "line": 10,
-                    "description": "Descrição detalhada do problema",
-                    "suggestion": "Sugestão de correção",
-                    "priority": "must_fix|should_fix|could_fix"
-                }}
-            ],
-            "suggested_improvements": [
-                {{
-                    "type": "refactor|optimize|enhance",
-                    "description": "Descrição da melhoria",
-                    "benefit": "Benefício esperado",
-                    "effort": "low|medium|high"
-                }}
-            ],
-            "positive_feedback": [
-                "Aspectos bem implementados"
-            ],
-            "test_recommendations": [
-                {{
-                    "test_type": "unit|integration|e2e",
-                    "scope": "O que testar",
-                    "priority": "high|medium|low"
-                }}
-            ],
-            "security_assessment": {{
-                "vulnerabilities_found": [],
-                "data_handling": "secure|needs_improvement",
-                "authentication_authorization": "adequate|insufficient"
-            }},
-            "performance_assessment": {{
-                "efficiency": "efficient|moderate|inefficient",
-                "bottlenecks_identified": [],
-                "optimization_suggestions": []
-            }}
+            "type": "bug|security|performance|maintainability|style",
+            "severity": "low|medium|high|critical",
+            "file": "src/main.py",
+            "line": 10,
+            "description": "Descrição detalhada do problema",
+            "suggestion": "Sugestão de correção",
+            "priority": "must_fix|should_fix|could_fix"
         }}
-        """
+    ],
+    "suggested_improvements": [
+        {{
+            "type": "refactor|optimize|enhance",
+            "description": "Descrição da melhoria",
+            "benefit": "Benefício esperado",
+            "effort": "low|medium|high"
+        }}
+    ],
+    "positive_feedback": [
+        "Aspectos bem implementados"
+    ],
+    "test_recommendations": [
+        {{
+            "test_type": "unit|integration|e2e",
+            "scope": "O que testar",
+            "priority": "high|medium|low"
+        }}
+    ],
+    "security_assessment": {{
+        "vulnerabilities_found": [],
+        "data_handling": "secure|needs_improvement",
+        "authentication_authorization": "adequate|insufficient"
+    }},
+    "performance_assessment": {{
+        "efficiency": "efficient|moderate|inefficient",
+        "bottlenecks_identified": [],
+        "optimization_suggestions": []
+    }}
+}}
+"""
 
-        response = await self.llm.generate_response(prompt, temperature=temperature)
+        response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
             review = json.loads(response)

@@ -85,46 +85,51 @@ class Agent8_Finalizador(BaseAgent):
         if not issues_to_fix:
             return {"no_corrections_needed": True}
 
+        # Carrega template especializado
+        template_base = self._build_prompt("developer", {})
+        
         prompt = f"""
-        Como Desenvolvedor Sênior, corrija os problemas identificados na revisão:
-        TASK: {task_id}
-        IMPLEMENTAÇÃO ORIGINAL: {json.dumps(implementation, indent=2)}
-        REVISÃO: {json.dumps(review, indent=2)}
+{template_base}
 
-        Correções necessárias:
-        {json.dumps(issues_to_fix, indent=2)}
+Corrija os problemas identificados na revisão:
+TASK: {task_id}
+IMPLEMENTAÇÃO ORIGINAL: {json.dumps(implementation, indent=2)}
+REVISÃO: {json.dumps(review, indent=2)}
 
-        Gere a versão corrigida seguindo:
-        1. Corrija todos os issues de prioridade 'must_fix'
-        2. Considere as sugestões de melhoria
-        3. Mantenha a funcionalidade existente
-        4. Melhore a qualidade sem quebrar funcionalidades
+Correções necessárias:
+{json.dumps(issues_to_fix, indent=2)}
 
-        RESPOSTA EM JSON (mesmo formato da implementação original):
+Gere a versão corrigida seguindo:
+1. Corrija todos os issues de prioridade 'must_fix'
+2. Considere as sugestões de melhoria
+3. Mantenha a funcionalidade existente
+4. Melhore a qualidade sem quebrar funcionalidades
+
+RESPOSTA EM JSON (mesmo formato da implementação original):
+{{
+    "task_id": "{task_id}",
+    "files_created_modified": [
         {{
-            "task_id": "{task_id}",
-            "files_created_modified": [
-                {{
-                    "file_path": "src/main.py",
-                    "content": "código corrigido aqui",
-                    "action": "modify",
-                    "description": "Correções aplicadas baseadas na revisão"
-                }}
-            ],
-            "corrections_applied": [
-                {{
-                    "issue_description": "Descrição do issue corrigido",
-                    "correction_description": "Como foi corrigido",
-                    "file_affected": "src/main.py"
-                }}
-            ],
-            "improvements_made": [
-                "Lista de melhorias aplicadas"
-            ]
+            "file_path": "src/main.py",
+            "content": "código corrigido aqui",
+            "action": "modify",
+            "description": "Correções aplicadas baseadas na revisão"
         }}
-        """
+    ],
+    "corrections_applied": [
+        {{
+            "issue_description": "Descrição do issue corrigido",
+            "correction_description": "Como foi corrigido",
+            "file_affected": "src/main.py"
+        }}
+    ],
+    "improvements_made": [
+        "Lista de melhorias aplicadas"
+    ]
+}}
+"""
 
-        response = await self.llm.generate_response(prompt, temperature=temperature)
+        response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
             correction = json.loads(response)
@@ -145,59 +150,64 @@ class Agent8_Finalizador(BaseAgent):
         temperature: float,
     ) -> dict[str, any]:
         """Gera documentação abrangente do projeto"""
+        # Carrega template especializado
+        template_base = self._build_prompt("finalizer", {})
+        
         prompt = f"""
-        Como Documentador Técnico, crie documentação completa para:
-        CÓDIGO IMPLEMENTADO: {json.dumps(implemented_code, indent=2)}
-        ESTRUTURA DO PROJETO: {json.dumps(project_structure, indent=2)}
-        TASKS TÉCNICAS: {json.dumps(technical_tasks, indent=2)}
+{template_base}
 
-        Gere a seguinte documentação:
-        1. README principal
-        2. Guia de instalação e setup
-        3. Guia de desenvolvimento
-        4. Documentação da API (se aplicável)
-        5. Guia de deploy
-        6. Documentação de arquitetura
-        7. Troubleshooting comum
+Crie documentação completa para:
+CÓDIGO IMPLEMENTADO: {json.dumps(implemented_code, indent=2)}
+ESTRUTURA DO PROJETO: {json.dumps(project_structure, indent=2)}
+TASKS TÉCNICAS: {json.dumps(technical_tasks, indent=2)}
 
-        FORMATO JSON:
-        {{
-            "readme_main": {{
-                "file_path": "README.md",
-                "content": "# Conteúdo completo do README"
-            }},
-            "installation_guide": {{
-                "file_path": "docs/INSTALLATION.md",
-                "content": "Guia de instalação"
-            }},
-            "development_guide": {{
-                "file_path": "docs/DEVELOPMENT.md",
-                "content": "Guia para desenvolvedores"
-            }},
-            "api_documentation": {{
-                "file_path": "docs/API.md",
-                "content": "Documentação da API"
-            }},
-            "deployment_guide": {{
-                "file_path": "docs/DEPLOYMENT.md",
-                "content": "Guia de deploy"
-            }},
-            "architecture_documentation": {{
-                "file_path": "docs/ARCHITECTURE.md",
-                "content": "Documentação arquitetural"
-            }},
-            "troubleshooting_guide": {{
-                "file_path": "docs/TROUBLESHOOTING.md",
-                "content": "Guia de troubleshooting"
-            }},
-            "code_comments_summary": {{
-                "file_path": "docs/CODE_OVERVIEW.md",
-                "content": "Visão geral do código"
-            }}
-        }}
-        """
+Gere a seguinte documentação:
+1. README principal
+2. Guia de instalação e setup
+3. Guia de desenvolvimento
+4. Documentação da API (se aplicável)
+5. Guia de deploy
+6. Documentação de arquitetura
+7. Troubleshooting comum
 
-        response = await self.llm.generate_response(prompt, temperature=temperature)
+FORMATO JSON:
+{{
+    "readme_main": {{
+        "file_path": "README.md",
+        "content": "# Conteúdo completo do README"
+    }},
+    "installation_guide": {{
+        "file_path": "docs/INSTALLATION.md",
+        "content": "Guia de instalação"
+    }},
+    "development_guide": {{
+        "file_path": "docs/DEVELOPMENT.md",
+        "content": "Guia para desenvolvedores"
+    }},
+    "api_documentation": {{
+        "file_path": "docs/API.md",
+        "content": "Documentação da API"
+    }},
+    "deployment_guide": {{
+        "file_path": "docs/DEPLOYMENT.md",
+        "content": "Guia de deploy"
+    }},
+    "architecture_documentation": {{
+        "file_path": "docs/ARCHITECTURE.md",
+        "content": "Documentação arquitetural"
+    }},
+    "troubleshooting_guide": {{
+        "file_path": "docs/TROUBLESHOOTING.md",
+        "content": "Guia de troubleshooting"
+    }},
+    "code_comments_summary": {{
+        "file_path": "docs/CODE_OVERVIEW.md",
+        "content": "Visão geral do código"
+    }}
+}}
+"""
+
+        response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
             documentation = json.loads(response)

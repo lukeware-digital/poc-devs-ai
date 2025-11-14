@@ -40,9 +40,9 @@ class HardwareProfile:
         ram_gb = self.system_info.get("ram_gb", 0)
         vram_gb = self.system_info.get("vram_gb", 0)
 
-        # Perfil do usuário atual (Ryzen 5800X + RTX 3060 Ti)
+        # Perfil padrão para hardware médio-alto
         if "5800x" in cpu_model and "rtx 3060 ti" in gpu_model and ram_gb >= 32:
-            return "ryzen5800x_rtx3060ti"
+            return "default"
 
         # Outros perfis comuns
         profiles = [

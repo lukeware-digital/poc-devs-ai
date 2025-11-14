@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 from datetime import datetime
+from typing import Any, Optional
 
 import redis
 
@@ -82,7 +83,7 @@ class VersionedStore:
 
         return version
 
-    def get(self, key: str, version: int | None = None) -> any | None:
+    def get(self, key: str, version: int | None = None) -> Any | None:
         """
         Recupera um valor pelo key e versão
 
@@ -175,7 +176,7 @@ class SharedContext:
     Contexto compartilhado entre agentes com versionamento e concorrência controlada
     """
 
-    def __init__(self, config: dict[str, any | None] = None):
+    def __init__(self, config: dict = None):
         self.config = config or {}
         self._updating_completion = False  # Flag para evitar recursão
 

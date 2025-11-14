@@ -26,6 +26,7 @@ class MetricsCollector:
         self.last_gc_time = datetime.utcnow()
         self.last_alerts_cleanup = datetime.utcnow()
         self.max_alerts = 1000  # Limite de alertas em memória
+        self._collecting_system_metrics = False
 
         # Configura Redis para persistência de métricas
         self.redis = None
@@ -87,7 +88,7 @@ class MetricsCollector:
         self._detect_anomalies(agent_id)
 
         # Coleta métricas de sistema se configurado
-        if self.enable_system_metrics:
+        if self.enable_system_metrics and not self._collecting_system_metrics:
             self._collect_system_metrics()
 
     def _detect_anomalies(self, agent_id: str):
@@ -172,6 +173,7 @@ class MetricsCollector:
         """
         Coleta métricas de sistema
         """
+        self._collecting_system_metrics = True
         try:
             # Métricas de CPU
             cpu_percent = psutil.cpu_percent(interval=1)
@@ -216,6 +218,8 @@ class MetricsCollector:
 
         except Exception as e:
             logger.error(f"Erro ao coletar métricas de sistema: {str(e)}")
+        finally:
+            self._collecting_system_metrics = False
 
     def record_alert(self, alert_type: str, details: dict[str, any]):
         """

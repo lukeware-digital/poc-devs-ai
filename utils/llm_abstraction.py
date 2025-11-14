@@ -288,14 +288,24 @@ class LLMAbstractLayer:
         self.config = config
         self.providers = self._initialize_providers()
         cache_ttl = config.get("performance", {}).get("cache_ttl", 3600)
-        self.cache = ResponseCache(ttl_seconds=cache_ttl)
+        single_agent_mode = config.get("orchestrator", {}).get("single_agent_mode", True)
+
+        if single_agent_mode:
+            max_entries = 100
+        else:
+            max_entries = 1000
+
+        self.cache = ResponseCache(ttl_seconds=cache_ttl, max_entries=max_entries)
         self.current_provider_idx = 0
         self.agent_providers = {}
+        self.single_agent_mode = single_agent_mode
 
-        # Carrega capability tokens se disponível
         self.capability_tokens = config.get("capability_tokens", {})
 
-        logger.info(f"LLMAbstractLayer inicializado com {len(self.providers)} provedores")
+        logger.info(
+            f"LLMAbstractLayer inicializado com {len(self.providers)} provedores "
+            f"(single_agent_mode: {single_agent_mode})"
+        )
 
     def _initialize_providers(self) -> list[LLMProvider]:
         """Inicializa provedores de LLM baseado na configuração"""
@@ -432,6 +442,12 @@ class LLMAbstractLayer:
 
                 agent_name = agent_id or "default"
                 logger.info(f"Resposta gerada com {model_info['name']} (agent: {agent_name}) em {generation_time:.2f}s")
+
+                if self.single_agent_mode:
+                    import gc
+
+                    gc.collect()
+
                 return response
 
             except Exception as e:

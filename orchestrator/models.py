@@ -3,6 +3,7 @@ Modelos de dados para o orchestrator
 """
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -25,6 +26,8 @@ class ProjectState(BaseModel):
     failure_count: int = 0
     recovery_attempts: int = 0
     project_path: str | None = None
+    job_id: UUID | None = None
+    current_step_id: UUID | None = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:

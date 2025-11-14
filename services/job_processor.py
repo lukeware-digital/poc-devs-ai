@@ -77,7 +77,7 @@ class JobProcessor:
 
             await self.job_manager.update_job_status(job_id, current_step="Executando workflow DEVs AI", progress=40.0)
 
-            result = await self.system.process_request(job_request.user_input, project_path)
+            result = await self.system.process_request(job_request.user_input, project_path, job_id=str(job_id))
 
             await self.job_manager.update_job_status(
                 job_id, current_step="Aguardando aprovação para commit", progress=90.0

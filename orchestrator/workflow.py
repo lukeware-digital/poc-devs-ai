@@ -13,14 +13,19 @@ from agents.finalizer import Agent8_Finalizador
 from agents.product_manager import Agent2_ProductManager
 from agents.scaffolder import Agent5_Scaffolder
 from agents.tech_lead import Agent4_TechLead
+from config.logging_config import AgentAdapter
+from database.job_repository import JobRepository
+from database.step_repository import StepRepository
 from guardrails.security_system import GuardrailSystem
 from monitoring.metrics_collector import MetricsCollector
 from orchestrator.fallback_handler import FallbackHandler
 from orchestrator.models import ProjectState
 from rag.retriever import RAGRetriever
 from shared_context.context_manager import SharedContext
+from utils.llm_manager import LLMManager
 
 logger = logging.getLogger("DEVs_AI")
+workflow_logger = AgentAdapter(logger, {"agent_id": "workflow"})
 
 
 class DEVsAIOrchestrator:
@@ -33,6 +38,8 @@ class DEVsAIOrchestrator:
         self.shared_context = SharedContext(config)
         self.metrics_collector = MetricsCollector(config)
         self.fallback_handler = FallbackHandler(self.shared_context)
+        self.llm_manager = LLMManager(config)
+        self.single_agent_mode = config.get("orchestrator", {}).get("single_agent_mode", True)
         self.setup_components()
         self.workflow = self.create_complete_workflow()
 
@@ -240,9 +247,58 @@ class DEVsAIOrchestrator:
         workflow.set_entry_point("agent1")
         return workflow.compile()
 
+    async def _prepare_agent_execution(self, agent_id: str, state: ProjectState) -> bool:
+        if not self.single_agent_mode:
+            return True
+
+        model_name = self.config.get("agent_models", {}).get(agent_id, self.config.get("primary_model", ""))
+        ready = await self.llm_manager.ensure_model_ready(agent_id, model_name)
+
+        if ready and state.job_id:
+            step_name = f"{agent_id}_{state.current_phase}"
+            step_id = await StepRepository.create_step(
+                job_id=state.job_id,
+                agent_id=agent_id,
+                step_name=step_name,
+                metadata={"phase": state.current_phase},
+            )
+            state.current_step_id = step_id
+            await StepRepository.update_step_status(step_id, "running")
+
+        return ready
+
+    async def _cleanup_agent_execution(
+        self, agent_id: str, state: ProjectState, success: bool = True, error: str | None = None
+    ):
+        if self.single_agent_mode:
+            await self.llm_manager.release_lock(agent_id)
+
+        if state.current_step_id:
+            if success:
+                await StepRepository.update_step_status(state.current_step_id, "completed")
+            else:
+                await StepRepository.record_step_failure(
+                    state.current_step_id,
+                    error_message=error or "Erro desconhecido",
+                    error_cause=f"Falha na execução do {agent_id}",
+                )
+
+        import gc
+
+        gc.collect()
+
     async def agent1_node(self, state: ProjectState) -> ProjectState:
         """Executa o nó do Agent-1 (Clarificador)"""
+        workflow_logger.info("Iniciando execução do Agent-1 (Clarificador)")
+        start_time = datetime.utcnow()
+
+        agent_id = "agent1"
+
         try:
+            if not await self._prepare_agent_execution(agent_id, state):
+                raise Exception(f"Não foi possível garantir disponibilidade do modelo para {agent_id}")
+
+            workflow_logger.debug(f"Fase atual: {state.current_phase}")
             result = await self.agents["agent1"].execute(
                 {
                     "user_input": state.last_operation.get("user_input", ""),
@@ -259,17 +315,34 @@ class DEVsAIOrchestrator:
             }
             state.current_phase = "specification_complete"
 
-            # Coleta métricas
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            workflow_logger.info(f"Agent-1 concluído com sucesso em {execution_time:.2f}s")
+            workflow_logger.info("Transição: Agent-1 -> Agent-2")
+
+            await self._cleanup_agent_execution(agent_id, state, success=True)
+
             self.metrics_collector.record_agent_metrics(
                 "agent1",
                 {
                     "success": True,
-                    "execution_time": (datetime.utcnow() - state.timestamp).total_seconds(),
+                    "execution_time": execution_time,
                     "tasks_processed": 1,
                 },
             )
 
         except Exception as e:
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            workflow_logger.error(f"Agent-1 falhou após {execution_time:.2f}s: {str(e)}")
+
+            await self._cleanup_agent_execution(agent_id, state, success=False, error=str(e))
+
+            if state.job_id:
+                await JobRepository.update_job_failure_info(
+                    job_id=state.job_id,
+                    failed_step_id=state.current_step_id,
+                    failed_agent_id=agent_id,
+                )
+
             state.last_operation = {
                 "success": False,
                 "agent": "agent1",
@@ -278,13 +351,12 @@ class DEVsAIOrchestrator:
             }
             state.failure_count += 1
 
-            # Coleta métricas de falha
             self.metrics_collector.record_agent_metrics(
                 "agent1",
                 {
                     "success": False,
                     "error": str(e),
-                    "execution_time": (datetime.utcnow() - state.timestamp).total_seconds(),
+                    "execution_time": execution_time,
                 },
             )
 
@@ -292,7 +364,15 @@ class DEVsAIOrchestrator:
 
     async def agent2_node(self, state: ProjectState) -> ProjectState:
         """Executa o nó do Agent-2 (Product Manager)"""
+        workflow_logger.info("Iniciando execução do Agent-2 (Product Manager)")
+        start_time = datetime.utcnow()
+        agent_id = "agent2"
+
         try:
+            if not await self._prepare_agent_execution(agent_id, state):
+                raise Exception(f"Não foi possível garantir disponibilidade do modelo para {agent_id}")
+
+            workflow_logger.debug(f"Fase atual: {state.current_phase}")
             result = await self.agents["agent2"].execute(
                 {
                     "specification": state.task_specification,
@@ -309,17 +389,37 @@ class DEVsAIOrchestrator:
             }
             state.current_phase = "user_stories_complete"
 
-            # Coleta métricas
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            stories_count = len(result.get("user_stories", {}).get("user_stories", []))
+            workflow_logger.info(
+                f"Agent-2 concluído com sucesso em {execution_time:.2f}s ({stories_count} stories criadas)"
+            )
+            workflow_logger.info("Transição: Agent-2 -> Agent-3")
+
+            await self._cleanup_agent_execution(agent_id, state, success=True)
+
             self.metrics_collector.record_agent_metrics(
                 "agent2",
                 {
                     "success": True,
-                    "execution_time": (datetime.utcnow() - state.timestamp).total_seconds(),
-                    "stories_created": len(result.get("user_stories", {}).get("user_stories", [])),
+                    "execution_time": execution_time,
+                    "stories_created": stories_count,
                 },
             )
 
         except Exception as e:
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            workflow_logger.error(f"Agent-2 falhou após {execution_time:.2f}s: {str(e)}")
+
+            await self._cleanup_agent_execution(agent_id, state, success=False, error=str(e))
+
+            if state.job_id:
+                await JobRepository.update_job_failure_info(
+                    job_id=state.job_id,
+                    failed_step_id=state.current_step_id,
+                    failed_agent_id=agent_id,
+                )
+
             state.last_operation = {
                 "success": False,
                 "agent": "agent2",
@@ -333,7 +433,7 @@ class DEVsAIOrchestrator:
                 {
                     "success": False,
                     "error": str(e),
-                    "execution_time": (datetime.utcnow() - state.timestamp).total_seconds(),
+                    "execution_time": execution_time,
                 },
             )
 
@@ -341,7 +441,15 @@ class DEVsAIOrchestrator:
 
     async def agent3_node(self, state: ProjectState) -> ProjectState:
         """Executa o nó do Agent-3 (Arquiteto)"""
+        workflow_logger.info("Iniciando execução do Agent-3 (Arquiteto)")
+        start_time = datetime.utcnow()
+        agent_id = "agent3"
+
         try:
+            if not await self._prepare_agent_execution(agent_id, state):
+                raise Exception(f"Não foi possível garantir disponibilidade do modelo para {agent_id}")
+
+            workflow_logger.debug(f"Fase atual: {state.current_phase}")
             result = await self.agents["agent3"].execute(
                 {
                     "specification": state.task_specification,
@@ -359,16 +467,37 @@ class DEVsAIOrchestrator:
             }
             state.current_phase = "architecture_complete"
 
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            components_count = len(result.get("architecture", {}).get("components", []))
+            workflow_logger.info(
+                f"Agent-3 concluído com sucesso em {execution_time:.2f}s ({components_count} componentes)"
+            )
+            workflow_logger.info("Transição: Agent-3 -> Agent-4")
+
+            await self._cleanup_agent_execution(agent_id, state, success=True)
+
             self.metrics_collector.record_agent_metrics(
                 "agent3",
                 {
                     "success": True,
-                    "execution_time": (datetime.utcnow() - state.timestamp).total_seconds(),
-                    "components_defined": len(result.get("architecture", {}).get("components", [])),
+                    "execution_time": execution_time,
+                    "components_defined": components_count,
                 },
             )
 
         except Exception as e:
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            workflow_logger.error(f"Agent-3 falhou após {execution_time:.2f}s: {str(e)}")
+
+            await self._cleanup_agent_execution(agent_id, state, success=False, error=str(e))
+
+            if state.job_id:
+                await JobRepository.update_job_failure_info(
+                    job_id=state.job_id,
+                    failed_step_id=state.current_step_id,
+                    failed_agent_id=agent_id,
+                )
+
             state.last_operation = {
                 "success": False,
                 "agent": "agent3",
@@ -382,7 +511,7 @@ class DEVsAIOrchestrator:
                 {
                     "success": False,
                     "error": str(e),
-                    "execution_time": (datetime.utcnow() - state.timestamp).total_seconds(),
+                    "execution_time": execution_time,
                 },
             )
 
@@ -390,7 +519,15 @@ class DEVsAIOrchestrator:
 
     async def agent4_node(self, state: ProjectState) -> ProjectState:
         """Executa o nó do Agent-4 (Tech Lead)"""
+        workflow_logger.info("Iniciando execução do Agent-4 (Tech Lead)")
+        start_time = datetime.utcnow()
+        agent_id = "agent4"
+
         try:
+            if not await self._prepare_agent_execution(agent_id, state):
+                raise Exception(f"Não foi possível garantir disponibilidade do modelo para {agent_id}")
+
+            workflow_logger.debug(f"Fase atual: {state.current_phase}")
             result = await self.agents["agent4"].execute(
                 {
                     "specification": state.task_specification,
@@ -409,16 +546,37 @@ class DEVsAIOrchestrator:
             }
             state.current_phase = "technical_planning_complete"
 
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            tasks_count = len(result.get("technical_tasks", {}).get("technical_tasks", []))
+            workflow_logger.info(
+                f"Agent-4 concluído com sucesso em {execution_time:.2f}s ({tasks_count} tarefas criadas)"
+            )
+            workflow_logger.info("Transição: Agent-4 -> Agent-5")
+
+            await self._cleanup_agent_execution(agent_id, state, success=True)
+
             self.metrics_collector.record_agent_metrics(
                 "agent4",
                 {
                     "success": True,
-                    "execution_time": (datetime.utcnow() - state.timestamp).total_seconds(),
-                    "tasks_created": len(result.get("technical_tasks", {}).get("technical_tasks", [])),
+                    "execution_time": execution_time,
+                    "tasks_created": tasks_count,
                 },
             )
 
         except Exception as e:
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            workflow_logger.error(f"Agent-4 falhou após {execution_time:.2f}s: {str(e)}")
+
+            await self._cleanup_agent_execution(agent_id, state, success=False, error=str(e))
+
+            if state.job_id:
+                await JobRepository.update_job_failure_info(
+                    job_id=state.job_id,
+                    failed_step_id=state.current_step_id,
+                    failed_agent_id=agent_id,
+                )
+
             state.last_operation = {
                 "success": False,
                 "agent": "agent4",
@@ -432,7 +590,7 @@ class DEVsAIOrchestrator:
                 {
                     "success": False,
                     "error": str(e),
-                    "execution_time": (datetime.utcnow() - state.timestamp).total_seconds(),
+                    "execution_time": execution_time,
                 },
             )
 
@@ -440,7 +598,15 @@ class DEVsAIOrchestrator:
 
     async def agent5_node(self, state: ProjectState) -> ProjectState:
         """Executa o nó do Agent-5 (Scaffolder)"""
+        workflow_logger.info("Iniciando execução do Agent-5 (Scaffolder)")
+        start_time = datetime.utcnow()
+        agent_id = "agent5"
+
         try:
+            if not await self._prepare_agent_execution(agent_id, state):
+                raise Exception(f"Não foi possível garantir disponibilidade do modelo para {agent_id}")
+
+            workflow_logger.debug(f"Fase atual: {state.current_phase}")
             result = await self.agents["agent5"].execute(
                 {
                     "architecture": state.architecture,
@@ -458,16 +624,37 @@ class DEVsAIOrchestrator:
             }
             state.current_phase = "scaffolding_complete"
 
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            files_count = len(result.get("files_created", []))
+            workflow_logger.info(
+                f"Agent-5 concluído com sucesso em {execution_time:.2f}s ({files_count} arquivos criados)"
+            )
+            workflow_logger.info("Transição: Agent-5 -> Agent-6")
+
+            await self._cleanup_agent_execution(agent_id, state, success=True)
+
             self.metrics_collector.record_agent_metrics(
                 "agent5",
                 {
                     "success": True,
-                    "execution_time": (datetime.utcnow() - state.timestamp).total_seconds(),
-                    "files_created": len(result.get("files_created", [])),
+                    "execution_time": execution_time,
+                    "files_created": files_count,
                 },
             )
 
         except Exception as e:
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            workflow_logger.error(f"Agent-5 falhou após {execution_time:.2f}s: {str(e)}")
+
+            await self._cleanup_agent_execution(agent_id, state, success=False, error=str(e))
+
+            if state.job_id:
+                await JobRepository.update_job_failure_info(
+                    job_id=state.job_id,
+                    failed_step_id=state.current_step_id,
+                    failed_agent_id=agent_id,
+                )
+
             state.last_operation = {
                 "success": False,
                 "agent": "agent5",
@@ -481,7 +668,7 @@ class DEVsAIOrchestrator:
                 {
                     "success": False,
                     "error": str(e),
-                    "execution_time": (datetime.utcnow() - state.timestamp).total_seconds(),
+                    "execution_time": execution_time,
                 },
             )
 
@@ -489,7 +676,15 @@ class DEVsAIOrchestrator:
 
     async def agent6_node(self, state: ProjectState) -> ProjectState:
         """Executa o nó do Agent-6 (Desenvolvedor)"""
+        workflow_logger.info("Iniciando execução do Agent-6 (Desenvolvedor)")
+        start_time = datetime.utcnow()
+        agent_id = "agent6"
+
         try:
+            if not await self._prepare_agent_execution(agent_id, state):
+                raise Exception(f"Não foi possível garantir disponibilidade do modelo para {agent_id}")
+
+            workflow_logger.debug(f"Fase atual: {state.current_phase}")
             result = await self.agents["agent6"].execute(
                 {
                     "technical_tasks": state.technical_tasks,
@@ -508,17 +703,39 @@ class DEVsAIOrchestrator:
             }
             state.current_phase = "implementation_complete"
 
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            tasks_impl = len(result.get("implemented_tasks", []))
+            files_mod = len(result.get("files_modified", []))
+            workflow_logger.info(
+                f"Agent-6 concluído com sucesso em {execution_time:.2f}s ({tasks_impl} tarefas, {files_mod} arquivos)"
+            )
+            workflow_logger.info("Transição: Agent-6 -> Agent-7")
+
+            await self._cleanup_agent_execution(agent_id, state, success=True)
+
             self.metrics_collector.record_agent_metrics(
                 "agent6",
                 {
                     "success": True,
-                    "execution_time": (datetime.utcnow() - state.timestamp).total_seconds(),
-                    "tasks_implemented": len(result.get("implemented_tasks", [])),
-                    "files_modified": len(result.get("files_modified", [])),
+                    "execution_time": execution_time,
+                    "tasks_implemented": tasks_impl,
+                    "files_modified": files_mod,
                 },
             )
 
         except Exception as e:
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            workflow_logger.error(f"Agent-6 falhou após {execution_time:.2f}s: {str(e)}")
+
+            await self._cleanup_agent_execution(agent_id, state, success=False, error=str(e))
+
+            if state.job_id:
+                await JobRepository.update_job_failure_info(
+                    job_id=state.job_id,
+                    failed_step_id=state.current_step_id,
+                    failed_agent_id=agent_id,
+                )
+
             state.last_operation = {
                 "success": False,
                 "agent": "agent6",
@@ -532,7 +749,7 @@ class DEVsAIOrchestrator:
                 {
                     "success": False,
                     "error": str(e),
-                    "execution_time": (datetime.utcnow() - state.timestamp).total_seconds(),
+                    "execution_time": execution_time,
                 },
             )
 
@@ -540,7 +757,15 @@ class DEVsAIOrchestrator:
 
     async def agent7_node(self, state: ProjectState) -> ProjectState:
         """Executa o nó do Agent-7 (Code Reviewer)"""
+        workflow_logger.info("Iniciando execução do Agent-7 (Code Reviewer)")
+        start_time = datetime.utcnow()
+        agent_id = "agent7"
+
         try:
+            if not await self._prepare_agent_execution(agent_id, state):
+                raise Exception(f"Não foi possível garantir disponibilidade do modelo para {agent_id}")
+
+            workflow_logger.debug(f"Fase atual: {state.current_phase}")
             result = await self.agents["agent7"].execute(
                 {
                     "implemented_code": state.implemented_code,
@@ -559,22 +784,48 @@ class DEVsAIOrchestrator:
             }
             state.current_phase = "review_complete"
 
-            # Se não aprovado, incrementa contador para possível retry
-            if not result.get("overall_approval", False):
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            reviews_count = len(result.get("reviews", {}))
+            approved = result.get("overall_approval", False)
+            quality_score = result.get("quality_metrics", {}).get("average_score", 0)
+
+            if not approved:
                 state.failure_count += 1
+                workflow_logger.warning(f"Agent-7 concluído mas código não aprovado (score: {quality_score})")
+            else:
+                workflow_logger.info(
+                    f"Agent-7 concluído com sucesso em {execution_time:.2f}s "
+                    f"({reviews_count} revisões, score: {quality_score})"
+                )
+
+            workflow_logger.info("Transição: Agent-7 -> Agent-8")
+
+            await self._cleanup_agent_execution(agent_id, state, success=True)
 
             self.metrics_collector.record_agent_metrics(
                 "agent7",
                 {
                     "success": True,
-                    "execution_time": (datetime.utcnow() - state.timestamp).total_seconds(),
-                    "reviews_performed": len(result.get("reviews", {})),
-                    "overall_approval": result.get("overall_approval", False),
-                    "quality_score": result.get("quality_metrics", {}).get("average_score", 0),
+                    "execution_time": execution_time,
+                    "reviews_performed": reviews_count,
+                    "overall_approval": approved,
+                    "quality_score": quality_score,
                 },
             )
 
         except Exception as e:
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            workflow_logger.error(f"Agent-7 falhou após {execution_time:.2f}s: {str(e)}")
+
+            await self._cleanup_agent_execution(agent_id, state, success=False, error=str(e))
+
+            if state.job_id:
+                await JobRepository.update_job_failure_info(
+                    job_id=state.job_id,
+                    failed_step_id=state.current_step_id,
+                    failed_agent_id=agent_id,
+                )
+
             state.last_operation = {
                 "success": False,
                 "agent": "agent7",
@@ -588,7 +839,7 @@ class DEVsAIOrchestrator:
                 {
                     "success": False,
                     "error": str(e),
-                    "execution_time": (datetime.utcnow() - state.timestamp).total_seconds(),
+                    "execution_time": execution_time,
                 },
             )
 
@@ -596,7 +847,15 @@ class DEVsAIOrchestrator:
 
     async def agent8_node(self, state: ProjectState) -> ProjectState:
         """Executa o nó do Agent-8 (Finalizador)"""
+        workflow_logger.info("Iniciando execução do Agent-8 (Finalizador)")
+        start_time = datetime.utcnow()
+        agent_id = "agent8"
+
         try:
+            if not await self._prepare_agent_execution(agent_id, state):
+                raise Exception(f"Não foi possível garantir disponibilidade do modelo para {agent_id}")
+
+            workflow_logger.debug(f"Fase atual: {state.current_phase}")
             result = await self.agents["agent8"].execute(
                 {
                     "implemented_code": state.implemented_code,
@@ -616,17 +875,40 @@ class DEVsAIOrchestrator:
             }
             state.current_phase = "project_complete"
 
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            docs_count = len(result.get("documentation_generated", {}))
+            corrections_count = len(result.get("corrections_applied", {}))
+            workflow_logger.info(
+                f"Agent-8 concluído com sucesso em {execution_time:.2f}s "
+                f"({docs_count} docs, {corrections_count} correções)"
+            )
+            workflow_logger.info("Workflow completo! Projeto finalizado.")
+
+            await self._cleanup_agent_execution(agent_id, state, success=True)
+
             self.metrics_collector.record_agent_metrics(
                 "agent8",
                 {
                     "success": True,
-                    "execution_time": (datetime.utcnow() - state.timestamp).total_seconds(),
-                    "documentation_files": len(result.get("documentation_generated", {})),
-                    "corrections_applied": len(result.get("corrections_applied", {})),
+                    "execution_time": execution_time,
+                    "documentation_files": docs_count,
+                    "corrections_applied": corrections_count,
                 },
             )
 
         except Exception as e:
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            workflow_logger.error(f"Agent-8 falhou após {execution_time:.2f}s: {str(e)}")
+
+            await self._cleanup_agent_execution(agent_id, state, success=False, error=str(e))
+
+            if state.job_id:
+                await JobRepository.update_job_failure_info(
+                    job_id=state.job_id,
+                    failed_step_id=state.current_step_id,
+                    failed_agent_id=agent_id,
+                )
+
             state.last_operation = {
                 "success": False,
                 "agent": "agent8",
@@ -640,7 +922,7 @@ class DEVsAIOrchestrator:
                 {
                     "success": False,
                     "error": str(e),
-                    "execution_time": (datetime.utcnow() - state.timestamp).total_seconds(),
+                    "execution_time": execution_time,
                 },
             )
 
@@ -1113,31 +1395,43 @@ class DEVsAIOrchestrator:
 
         return state
 
-    async def execute_workflow(self, user_input: str, project_path: str | None = None) -> dict[str, any]:
+    async def execute_workflow(
+        self, user_input: str, project_path: str | None = None, job_id: str | None = None
+    ) -> dict[str, any]:
         """Executa o fluxo completo do DEVs AI"""
+        workflow_logger.info("=== Iniciando execução do workflow DEVs AI ===")
+        workflow_logger.info(f"Input do usuário: {user_input[:200] if len(user_input) > 200 else user_input}")
+        workflow_logger.info(f"Caminho do projeto: {project_path or 'N/A'}")
+
+        from uuid import UUID
+
+        job_uuid = UUID(job_id) if job_id else None
+
         initial_state = ProjectState(
             last_operation={"user_input": user_input, "success": True},
             project_path=project_path,
+            job_id=job_uuid,
             timestamp=datetime.utcnow(),
         )
 
         recursion_limit = self.config.get("orchestrator", {}).get("recursion_limit", 15)
 
         try:
-            # Executa o workflow com recursion limit
             config = {"recursion_limit": recursion_limit}
 
-            # Log quando se aproxima do limite
             if recursion_limit <= 20:
-                logger.info(f"Executando workflow com limite de recursão: {recursion_limit}")
+                workflow_logger.warning(f"Limite de recursão baixo: {recursion_limit}")
 
+            workflow_logger.info("Executando workflow...")
             final_state = await self.workflow.ainvoke(initial_state, config=config)
 
-            # Calcula métricas finais
             execution_time = (datetime.utcnow() - initial_state.timestamp).total_seconds()
             phases_completed = self._get_completed_phases(final_state)
 
-            # Retorna resultado estruturado
+            workflow_logger.info(f"=== Workflow concluído em {execution_time:.2f}s ===")
+            workflow_logger.info(f"Fases completadas: {', '.join(phases_completed)}")
+            workflow_logger.info(f"Status final: {final_state.current_phase}")
+
             return {
                 "success": True,
                 "execution_time": execution_time,
@@ -1147,7 +1441,9 @@ class DEVsAIOrchestrator:
             }
 
         except Exception as e:
-            logger.error(f"Erro no fluxo principal: {str(e)}")
+            execution_time = (datetime.utcnow() - initial_state.timestamp).total_seconds()
+            workflow_logger.error(f"=== Erro no workflow após {execution_time:.2f}s ===")
+            workflow_logger.error(f"Erro: {str(e)}", exc_info=True)
 
             # Coleta métricas de falha
             self.metrics_collector.record_system_error(str(e))

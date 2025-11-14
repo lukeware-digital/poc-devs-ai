@@ -154,3 +154,41 @@ class JobRepository:
                 """,
                 job_id,
             )
+
+    @staticmethod
+    async def update_job_failure_info(
+        job_id: UUID,
+        failed_step_id: UUID | None = None,
+        failed_agent_id: str | None = None,
+    ):
+        pool = await DatabaseConnection.get_pool()
+        async with pool.acquire() as conn:
+            updates = []
+            params = []
+            param_idx = 1
+
+            if failed_step_id is not None:
+                updates.append(f"failed_step_id = ${param_idx}")
+                params.append(failed_step_id)
+                param_idx += 1
+
+            if failed_agent_id is not None:
+                updates.append(f"failed_agent_id = ${param_idx}")
+                params.append(failed_agent_id)
+                param_idx += 1
+
+            if not updates:
+                return
+
+            updates.append(f"updated_at = ${param_idx}")
+            params.append(datetime.now(timezone.utc))
+            param_idx += 1
+
+            params.append(job_id)
+
+            query = f"""
+                UPDATE jobs
+                SET {", ".join(updates)}
+                WHERE id = ${param_idx}
+            """
+            await conn.execute(query, *params)

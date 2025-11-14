@@ -50,7 +50,8 @@ agents:
     max_retries: 2
 # Orquestração
 orchestrator:
-  concurrent_agents: 3
+  single_agent_mode: true
+  concurrent_agents: 1
   max_auto_retries: 2
   state_checkpoint_interval: 60
   circuit_breaker:
@@ -61,13 +62,13 @@ orchestrator:
   max_retry_attempts: 3
 # Performance
 performance:
-  batch_processing: true
+  batch_processing: false
   gpu_offloading: true
   max_startup_time: 120
   memory_management:
     swap_usage_limit: 0.5
     gc_interval: 300
-  cache_ttl: 7200
+  cache_ttl: 3600
   max_tokens:
     agent1: 2048
     agent2: 2048

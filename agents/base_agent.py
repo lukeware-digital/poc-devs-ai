@@ -1,5 +1,8 @@
 import logging
+import traceback
 from datetime import datetime
+
+from config.logging_config import AgentAdapter
 
 logger = logging.getLogger("DEVs_AI")
 
@@ -30,34 +33,63 @@ class BaseAgent:
             "last_execution": None,
         }
         self._prompt_loader = None
+        self._logger = AgentAdapter(logger, {"agent_id": agent_id})
 
     async def execute(self, task: dict[str, any]) -> dict[str, any]:
         """
         Executa uma tarefa com o agente, incluindo verificação de permissões e tratamento de erros.
         """
         start_time = datetime.utcnow()
+        operation = task.get("operation", "default")
+
+        self._logger.info(f"Iniciando tarefa: {operation}")
+        self._logger.debug(f"Detalhes da tarefa: {self._sanitize_task_for_log(task)}")
+
         try:
-            # Verifica permissões
-            operation = task.get("operation", "default")
+            self._logger.debug("Verificando permissões...")
             allowed, reason = await self.guardrails.check_permission(self.agent_id, operation, task.get("context", {}))
             if not allowed:
+                self._logger.error(f"Permissão negada: {reason}")
                 raise PermissionError(f"Operação não permitida: {reason}")
 
-            # Executa a tarefa específica do agente
+            self._logger.info("Permissão concedida, executando tarefa...")
+
             result = await self._execute_task(task)
 
-            # Atualiza métricas
-            self.metrics["success_count"] += 1
             execution_time = (datetime.utcnow() - start_time).total_seconds()
+            self.metrics["success_count"] += 1
             self.metrics["total_response_time"] += execution_time
             self.metrics["last_execution"] = datetime.utcnow()
-            logger.info(f"Agente {self.agent_id} executado com sucesso em {execution_time:.2f}s")
+
+            self._logger.info(f"Tarefa concluída com sucesso em {execution_time:.2f}s")
+            self._logger.debug(f"Resultado: {self._sanitize_result_for_log(result)}")
+
             return result
 
         except Exception as e:
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
             self.metrics["failure_count"] += 1
-            logger.error(f"Erro no agente {self.agent_id}: {str(e)}")
+
+            error_trace = traceback.format_exc()
+            self._logger.error(f"Erro na execução da tarefa após {execution_time:.2f}s: {str(e)}")
+            self._logger.debug(f"Stack trace: {error_trace}")
+
             raise
+
+    def _sanitize_task_for_log(self, task: dict[str, any]) -> dict[str, any]:
+        sanitized = task.copy()
+        if "user_input" in sanitized and len(str(sanitized["user_input"])) > 200:
+            sanitized["user_input"] = str(sanitized["user_input"])[:200] + "..."
+        return sanitized
+
+    def _sanitize_result_for_log(self, result: dict[str, any]) -> dict[str, any]:
+        sanitized = result.copy()
+        for key, value in sanitized.items():
+            if isinstance(value, str) and len(value) > 200:
+                sanitized[key] = value[:200] + "..."
+            elif isinstance(value, dict):
+                sanitized[key] = self._sanitize_result_for_log(value)
+        return sanitized
 
     async def _execute_task(self, task: dict[str, any]) -> dict[str, any]:
         """

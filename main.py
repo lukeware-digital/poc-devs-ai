@@ -3,13 +3,9 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-# Configuração de logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("devs_ai.log"), logging.StreamHandler()],
-)
-logger = logging.getLogger("DEVs_AI")
+from config.logging_config import setup_logging
+
+logger = setup_logging(logging.INFO)
 
 
 class DEVsAISystem:
@@ -167,7 +163,9 @@ class DEVsAISystem:
             ]
         return response
 
-    async def process_request(self, user_input: str, project_path: str | None = None) -> dict[str, Any]:
+    async def process_request(
+        self, user_input: str, project_path: str | None = None, job_id: str | None = None
+    ) -> dict[str, Any]:
         """Processa uma solicitação do usuário"""
         if not self.is_initialized:
             raise RuntimeError("Sistema não inicializado")
@@ -182,7 +180,7 @@ class DEVsAISystem:
 
         try:
             result = await asyncio.wait_for(
-                self.orchestrator.execute_workflow(user_input, project_path), timeout=timeout
+                self.orchestrator.execute_workflow(user_input, project_path, job_id), timeout=timeout
             )
             execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
             self._record_metrics(result.get("success", False), execution_time)

@@ -8,7 +8,6 @@ class JobRequest(BaseModel):
     repository_url: str = Field(..., description="URL do repositório Git")
     access_token: str = Field(..., description="Token de acesso ao repositório")
     user_input: str = Field(..., description="Solicitação do usuário para desenvolvimento")
-    project_path: str | None = Field(None, description="Caminho opcional do projeto")
 
 
 class JobStatus(BaseModel):

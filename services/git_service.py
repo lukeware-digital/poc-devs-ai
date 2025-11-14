@@ -1,13 +1,19 @@
 import asyncio
 import logging
+import os
 import shutil
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 from git import Repo
+from git.exc import GitCommandError
 
 logger = logging.getLogger("DEVs_AI")
+
+
+class AuthenticationError(Exception):
+    pass
 
 
 class GitService:
@@ -16,6 +22,8 @@ class GitService:
 
     async def clone_repository(self, repo_url: str, token: str, target_path: str) -> str:
         def _clone():
+            os.environ["GIT_TERMINAL_PROMPT"] = "0"
+            
             target = Path(target_path)
             if target.exists():
                 shutil.rmtree(target)
@@ -33,6 +41,17 @@ class GitService:
 
         try:
             return await asyncio.to_thread(_clone)
+        except GitCommandError as e:
+            error_str = str(e).lower()
+            if e.status == 128 and (
+                "authentication failed" in error_str
+                or "invalid username or token" in error_str
+                or "password authentication is not supported" in error_str
+            ):
+                logger.error(f"Erro de autenticação ao clonar repositório: {str(e)}")
+                raise AuthenticationError(f"Token de autenticação inválido: {str(e)}") from e
+            logger.error(f"Erro ao clonar repositório: {str(e)}")
+            raise
         except Exception as e:
             logger.error(f"Erro ao clonar repositório: {str(e)}")
             raise

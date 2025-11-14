@@ -6,10 +6,10 @@ from uuid import UUID
 
 from main import DEVsAISystem
 from models.job_model import JobRequest
-from services.git_service import GitService
+from services.git_service import AuthenticationError, GitService
 from services.job_manager import JobManager
 from services.project_analyzer import ProjectAnalyzer
-from utils.git_utils import ensure_temp_directory, sanitize_path
+from utils.git_utils import ensure_temp_directory
 
 logger = logging.getLogger("DEVs_AI")
 
@@ -26,12 +26,10 @@ class JobProcessor:
         try:
             await self.job_manager.update_job_status(job_id, status="running", current_step="Iniciando processamento")
 
-            project_path = job_request.project_path
-            if not project_path:
-                project_path = f"./temp/local/{job_id}"
-                ensure_temp_directory(project_path)
-
-            project_path = sanitize_path(project_path)
+            project_path = f"./temp/local/{job_id}"
+            ensure_temp_directory(project_path)
+            
+            await self.job_manager.update_job_project_path(job_id, project_path)
             await self.job_manager.update_job_status(
                 job_id, current_step="Preparando diretório do projeto", progress=5.0
             )
@@ -42,6 +40,17 @@ class JobProcessor:
                     await self.git_service.clone_repository(
                         job_request.repository_url, job_request.access_token, project_path
                     )
+                except AuthenticationError as e:
+                    error_msg = f"Erro de autenticação: Token inválido ou sem permissão para acessar o repositório"
+                    logger.error(f"Erro de autenticação ao clonar repositório: {str(e)}")
+                    await self.job_manager.update_job_status(
+                        job_id,
+                        status="failed",
+                        error_message=error_msg,
+                        current_step="Erro de autenticação",
+                        progress=0.0,
+                    )
+                    return {"success": False, "error": error_msg}
                 except Exception as e:
                     logger.error(f"Erro ao clonar repositório: {str(e)}")
                     if not await self.git_service.validate_repository(project_path):

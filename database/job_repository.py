@@ -129,6 +129,20 @@ class JobRepository:
             return [dict(row) for row in rows]
 
     @staticmethod
+    async def update_job_project_path(job_id: UUID, project_path: str):
+        pool = await DatabaseConnection.get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE jobs
+                SET project_path = $1, updated_at = CURRENT_TIMESTAMP
+                WHERE id = $2
+                """,
+                project_path,
+                job_id,
+            )
+
+    @staticmethod
     async def cancel_job(job_id: UUID):
         pool = await DatabaseConnection.get_pool()
         async with pool.acquire() as conn:

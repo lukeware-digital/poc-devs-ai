@@ -30,6 +30,9 @@ class JobManager:
     ):
         await self.repository.update_job_status(job_id, status, progress, current_step, error_message)
 
+    async def update_job_project_path(self, job_id: UUID, project_path: str):
+        await self.repository.update_job_project_path(job_id, project_path)
+
     async def list_jobs(self, status: str | None = None, limit: int = 100, offset: int = 0):
         return await self.repository.list_jobs(status, limit, offset)
 

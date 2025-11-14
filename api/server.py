@@ -153,15 +153,6 @@ async def process_request(request: ProcessRequest):
         raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
 
 
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "service": "DEVs AI API",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-
-
 @app.get("/api/health")
 async def health_check_api():
     return {
@@ -233,7 +224,7 @@ async def start_job(request: JobRequest):
         job_data = {
             "status": "pending",
             "repository_url": request.repository_url,
-            "project_path": request.project_path,
+            "project_path": None,
             "user_input": request.user_input,
             "progress": 0.0,
             "current_step": "Criando job",

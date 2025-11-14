@@ -146,24 +146,24 @@ class MetricsCollector:
         Cria alerta de anomalia com contexto detalhado
         """
         import traceback
-        
+
         context = context or {}
         recent_metrics = self.metrics_history.get(agent_id, [])
         last_metric = recent_metrics[-1] if recent_metrics else {}
-        
+
         consecutive_failures = 0
         for metric in reversed(recent_metrics[-10:]):
             if not metric.get("success", metric.get("success_rate", 100) < 50):
                 consecutive_failures += 1
             else:
                 break
-        
+
         stack_trace = None
         try:
             stack_trace = "".join(traceback.format_stack()[-5:-1])
         except Exception:
             pass
-        
+
         alert = {
             "timestamp": datetime.utcnow().isoformat(),
             "agent_id": agent_id,
@@ -193,7 +193,7 @@ class MetricsCollector:
                 "score": score,
                 "consecutive_failures": consecutive_failures,
                 "current_phase": context.get("current_phase", "unknown"),
-            }
+            },
         )
 
         if alert["severity"] in ["critical", "high"]:

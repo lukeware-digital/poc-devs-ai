@@ -649,7 +649,7 @@ class DEVsAIOrchestrator:
     async def fallback_agent_node(self, state: ProjectState) -> ProjectState:
         """Nó de fallback genérico usando FallbackHandler"""
         failing_agent = state.last_operation.get("agent", "unknown")
-        
+
         # Detecta loops: verifica se o mesmo agente falhou muitas vezes
         max_retry_attempts = self.config.get("orchestrator", {}).get("max_retry_attempts", 3)
         if state.recovery_attempts >= max_retry_attempts:
@@ -664,7 +664,7 @@ class DEVsAIOrchestrator:
                 "timestamp": datetime.utcnow(),
             }
             return state
-        
+
         return await self.fallback_handler.apply_fallback(state, failing_agent)
 
     async def fallback_agent1_node(self, state: ProjectState) -> ProjectState:
@@ -1126,11 +1126,11 @@ class DEVsAIOrchestrator:
         try:
             # Executa o workflow com recursion limit
             config = {"recursion_limit": recursion_limit}
-            
+
             # Log quando se aproxima do limite
             if recursion_limit <= 20:
                 logger.info(f"Executando workflow com limite de recursão: {recursion_limit}")
-            
+
             final_state = await self.workflow.ainvoke(initial_state, config=config)
 
             # Calcula métricas finais

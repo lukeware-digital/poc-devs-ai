@@ -24,9 +24,10 @@ RUN mkdir -p /app/chroma_data /app/logs
 # Variáveis de ambiente
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
+ENV PORT=8181
 
 # Porta padrão
-EXPOSE 8080
+EXPOSE 8181
 
 # Comando de execução
 CMD ["python", "main.py"]

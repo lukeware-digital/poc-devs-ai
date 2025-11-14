@@ -342,14 +342,14 @@ class LLMAbstractLayer:
             model_name = agent_models[agent_id]
             ollama_config = self.config.get("ollama", {})
             host = ollama_config.get("host", "localhost:11434")
-            
+
             providers = [OllamaProvider(model_name=model_name, host=host)]
-            
+
             fallback_models = self.config.get("fallback_models", [])
             for fallback_model in fallback_models:
                 if fallback_model != model_name:
                     providers.append(OllamaProvider(model_name=fallback_model, host=host))
-            
+
             self.agent_providers[agent_id] = providers
             logger.info(f"Providers específicos criados para {agent_id}: {model_name}")
             return providers
@@ -363,12 +363,12 @@ class LLMAbstractLayer:
         """
         if not response or not response.strip():
             return False
-        
+
         response_stripped = response.strip()
-        
+
         if len(response_stripped) < 3:
             return False
-        
+
         return True
 
     async def generate_response(
@@ -395,12 +395,12 @@ class LLMAbstractLayer:
             Resposta gerada
         """
         providers = self._get_providers_for_agent(agent_id)
-        
+
         if agent_id and agent_id in self.config.get("performance", {}).get("max_tokens", {}):
             max_tokens = self.config["performance"]["max_tokens"][agent_id]
 
         # Verifica cache primeiro
-        model_name = providers[0].get_model_info()['name']
+        model_name = providers[0].get_model_info()["name"]
         cached_response = self.cache.get(prompt, temperature, max_tokens, model_name)
         if cached_response:
             logger.info("Cache hit para resposta LLM")
@@ -424,11 +424,16 @@ class LLMAbstractLayer:
                 # Valida resposta antes de armazenar no cache
                 model_info = provider.get_model_info()
                 if self._is_valid_response(response):
-                    self.cache.set(prompt, temperature, max_tokens, model_info['name'], response)
+                    self.cache.set(prompt, temperature, max_tokens, model_info["name"], response)
                 else:
-                    logger.warning(f"Resposta inválida não será armazenada no cache: {response[:100] if response else 'vazia'}")
+                    logger.warning(
+                        f"Resposta inválida não será armazenada no cache: {response[:100] if response else 'vazia'}"
+                    )
 
-                logger.info(f"Resposta gerada com {model_info['name']} (agent: {agent_id or 'default'}) em {generation_time:.2f}s")
+                agent_name = agent_id or "default"
+                logger.info(
+                    f"Resposta gerada com {model_info['name']} (agent: {agent_name}) em {generation_time:.2f}s"
+                )
                 return response
 
             except Exception as e:

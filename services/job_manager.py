@@ -1,6 +1,7 @@
 import logging
+from typing import Any
 from uuid import UUID
-from typing import Optional, Dict, Any
+
 from database.job_repository import JobRepository
 
 logger = logging.getLogger("DEVs_AI")
@@ -9,31 +10,27 @@ logger = logging.getLogger("DEVs_AI")
 class JobManager:
     def __init__(self):
         self.repository = JobRepository()
-        self.active_jobs: Dict[UUID, Any] = {}
+        self.active_jobs: dict[UUID, Any] = {}
 
-    async def create_job(self, job_data: Dict[str, Any]) -> UUID:
+    async def create_job(self, job_data: dict[str, Any]) -> UUID:
         job_id = await self.repository.create_job(job_data)
         logger.info(f"Job criado: {job_id}")
         return job_id
 
-    async def get_job(self, job_id: UUID) -> Optional[Dict[str, Any]]:
+    async def get_job(self, job_id: UUID) -> dict[str, Any] | None:
         return await self.repository.get_job(job_id)
 
     async def update_job_status(
         self,
         job_id: UUID,
-        status: Optional[str] = None,
-        progress: Optional[float] = None,
-        current_step: Optional[str] = None,
-        error_message: Optional[str] = None,
+        status: str | None = None,
+        progress: float | None = None,
+        current_step: str | None = None,
+        error_message: str | None = None,
     ):
-        await self.repository.update_job_status(
-            job_id, status, progress, current_step, error_message
-        )
+        await self.repository.update_job_status(job_id, status, progress, current_step, error_message)
 
-    async def list_jobs(
-        self, status: Optional[str] = None, limit: int = 100, offset: int = 0
-    ):
+    async def list_jobs(self, status: str | None = None, limit: int = 100, offset: int = 0):
         return await self.repository.list_jobs(status, limit, offset)
 
     async def cancel_job(self, job_id: UUID) -> bool:
@@ -53,4 +50,3 @@ class JobManager:
     def unregister_active_job(self, job_id: UUID):
         if job_id in self.active_jobs:
             del self.active_jobs[job_id]
-

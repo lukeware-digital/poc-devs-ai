@@ -59,7 +59,7 @@ class Agent7_CodeReviewer(BaseAgent):
 
         # Carrega template especializado
         template_base = self._build_prompt("code_reviewer", {})
-        
+
         prompt = f"""
 {template_base}
 

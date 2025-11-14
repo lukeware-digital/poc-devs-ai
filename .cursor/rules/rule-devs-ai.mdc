@@ -1,0 +1,4 @@
+---
+trigger: always_on
+description: Regras gerais para implementação de IA, documentação, qualidade e segurança
+---

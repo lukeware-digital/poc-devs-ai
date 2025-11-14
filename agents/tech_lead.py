@@ -16,7 +16,7 @@ class Agent4_TechLead(BaseAgent):
 
         # Carrega template especializado
         template_base = self._build_prompt("tech_lead", {})
-        
+
         prompt = f"""
 {template_base}
 

@@ -29,7 +29,7 @@ class RAGRetriever:
             "commit": "commit_documents",
             "generic": "generic_documents",
         }
-        
+
         self.collections = {}
         for key, name in collection_names.items():
             try:

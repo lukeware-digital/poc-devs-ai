@@ -288,7 +288,9 @@ class FallbackHandler:
 
         return state
 
-    def _customize_fallback(self, state: ProjectState, agent_id: str, fallback_data: dict[str, object]) -> dict[str, object]:
+    def _customize_fallback(
+        self, state: ProjectState, agent_id: str, fallback_data: dict[str, object]
+    ) -> dict[str, object]:
         """Customiza dados de fallback com informações do estado"""
         if agent_id == "agent1" and state.last_operation.get("user_input"):
             fallback_data["description"] = state.last_operation["user_input"]

@@ -1,8 +1,7 @@
 import logging
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Any
 from uuid import UUID
-import asyncpg
 
 from database.connection import DatabaseConnection
 
@@ -11,7 +10,7 @@ logger = logging.getLogger("DEVs_AI")
 
 class JobRepository:
     @staticmethod
-    async def create_job(job_data: Dict[str, Any]) -> UUID:
+    async def create_job(job_data: dict[str, Any]) -> UUID:
         pool = await DatabaseConnection.get_pool()
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
@@ -30,7 +29,7 @@ class JobRepository:
             return row["id"]
 
     @staticmethod
-    async def get_job(job_id: UUID) -> Optional[Dict[str, Any]]:
+    async def get_job(job_id: UUID) -> dict[str, Any] | None:
         pool = await DatabaseConnection.get_pool()
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
@@ -49,10 +48,10 @@ class JobRepository:
     @staticmethod
     async def update_job_status(
         job_id: UUID,
-        status: Optional[str] = None,
-        progress: Optional[float] = None,
-        current_step: Optional[str] = None,
-        error_message: Optional[str] = None,
+        status: str | None = None,
+        progress: float | None = None,
+        current_step: str | None = None,
+        error_message: str | None = None,
     ):
         pool = await DatabaseConnection.get_pool()
         async with pool.acquire() as conn:
@@ -88,17 +87,17 @@ class JobRepository:
 
             query = f"""
                 UPDATE jobs
-                SET {', '.join(updates)}
+                SET {", ".join(updates)}
                 WHERE id = ${param_idx}
             """
             await conn.execute(query, *params)
 
     @staticmethod
     async def list_jobs(
-        status: Optional[str] = None,
+        status: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         pool = await DatabaseConnection.get_pool()
         async with pool.acquire() as conn:
             if status:
@@ -141,4 +140,3 @@ class JobRepository:
                 """,
                 job_id,
             )
-

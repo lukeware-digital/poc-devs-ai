@@ -1,13 +1,13 @@
-import os
 import logging
-from typing import Optional
+import os
+
 import asyncpg
 
 logger = logging.getLogger("DEVs_AI")
 
 
 class DatabaseConnection:
-    _pool: Optional[asyncpg.Pool] = None
+    _pool: asyncpg.Pool | None = None
 
     @classmethod
     async def get_pool(cls) -> asyncpg.Pool:
@@ -47,4 +47,3 @@ class DatabaseConnection:
             await cls._pool.close()
             cls._pool = None
             logger.info("Pool de conexões PostgreSQL fechado")
-

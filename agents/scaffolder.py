@@ -24,7 +24,7 @@ class Agent5_Scaffolder(BaseAgent):
 
         # Carrega template especializado
         template_base = self._build_prompt("scaffolder", {})
-        
+
         prompt = f"""
 {template_base}
 

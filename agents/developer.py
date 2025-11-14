@@ -57,7 +57,7 @@ class Agent6_Desenvolvedor(BaseAgent):
         """Implementa uma única task técnica"""
         # Carrega template especializado
         template_base = self._build_prompt("developer", {})
-        
+
         prompt = f"""
 {template_base}
 

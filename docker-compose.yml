@@ -83,11 +83,12 @@ services:
     container_name: devs-ai
     build: .
     ports:
-      - "8080:8080"
+      - "8181:8181"
     volumes:
       - chroma_data:/app/chroma_data
       - logs:/app/logs
     environment:
+      - PORT=8181
       - CHROMA_DB_HOST=chromadb
       - CHROMA_DB_PORT=8000
       - POSTGRES_DB=minha_base

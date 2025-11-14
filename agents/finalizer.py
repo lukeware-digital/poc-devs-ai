@@ -87,7 +87,7 @@ class Agent8_Finalizador(BaseAgent):
 
         # Carrega template especializado
         template_base = self._build_prompt("developer", {})
-        
+
         prompt = f"""
 {template_base}
 
@@ -152,7 +152,7 @@ RESPOSTA EM JSON (mesmo formato da implementação original):
         """Gera documentação abrangente do projeto"""
         # Carrega template especializado
         template_base = self._build_prompt("finalizer", {})
-        
+
         prompt = f"""
 {template_base}
 

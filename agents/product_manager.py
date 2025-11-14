@@ -14,7 +14,7 @@ class Agent2_ProductManager(BaseAgent):
 
         # Carrega template especializado
         template_base = self._build_prompt("product_manager", {})
-        
+
         prompt = f"""
 {template_base}
 

@@ -1,26 +1,25 @@
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Optional, List
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from main import DEVsAISystem
-from models.job_model import JobRequest, JobStatus, JobResponse, CommitApprovalRequest
-from services.job_processor import JobProcessor
-from services.job_manager import JobManager
 from database.connection import DatabaseConnection
+from main import DEVsAISystem
+from models.job_model import CommitApprovalRequest, JobRequest, JobResponse, JobStatus
+from services.job_manager import JobManager
+from services.job_processor import JobProcessor
 from utils.git_utils import create_archive
 
 logger = logging.getLogger("DEVs_AI")
 
 app = FastAPI(title="DEVs AI API", version="1.0.0")
-system: Optional[DEVsAISystem] = None
-job_processor: Optional[JobProcessor] = None
-job_manager: Optional[JobManager] = None
+system: DEVsAISystem | None = None
+job_processor: JobProcessor | None = None
+job_manager: JobManager | None = None
 
 
 class ProcessRequest(BaseModel):
@@ -31,15 +30,23 @@ class ProcessResponse(BaseModel):
     success: bool
     execution_time: float
     timestamp: str
-    result: Optional[dict] = None
-    error: Optional[str] = None
-    recovery_suggestions: Optional[list] = None
+    result: dict | None = None
+    error: str | None = None
+    recovery_suggestions: list | None = None
 
 
 @app.on_event("startup")
 async def startup_event():
     global system, job_processor, job_manager
+    import os
+
     from utils.hardware_detection import detect_hardware_profile
+
+    port = int(os.getenv("PORT", 8181))
+    host = os.getenv("HOST", "0.0.0.0")
+    api_url = f"http://{host if host != '0.0.0.0' else 'localhost'}:{port}"
+    logger.info(f"🚀 API disponível em: {api_url}")
+    logger.info(f"📚 Documentação: {api_url}/docs")
 
     hardware_profile = detect_hardware_profile()
     config_path = f"config/hardware_profiles/{hardware_profile}.yaml"
@@ -48,8 +55,9 @@ async def startup_event():
     try:
         await system.initialize()
         await DatabaseConnection.initialize()
-        
+
         from pathlib import Path
+
         migration_path = Path(__file__).parent.parent / "database" / "migrations" / "001_create_jobs_table.sql"
         if migration_path.exists():
             pool = await DatabaseConnection.get_pool()
@@ -57,7 +65,7 @@ async def startup_event():
                 migration_sql = migration_path.read_text()
                 await conn.execute(migration_sql)
                 logger.info("Migração do banco de dados executada com sucesso")
-        
+
         job_processor = JobProcessor(system)
         job_manager = JobManager()
         logger.info("Sistema DEVs AI inicializado via API")
@@ -66,26 +74,36 @@ async def startup_event():
         raise
 
 
+async def _close_llm_provider(provider):
+    if hasattr(provider, "client") and hasattr(provider.client, "close"):
+        try:
+            await provider.client.close()
+        except Exception as e:
+            logger.warning(f"Erro ao fechar cliente LLM: {str(e)}")
+    if hasattr(provider, "session") and provider.session:
+        try:
+            if not provider.session.closed:
+                await provider.session.close()
+        except Exception as e:
+            logger.warning(f"Erro ao fechar sessão LLM: {str(e)}")
+
+
+async def _cleanup_llm_resources(system):
+    if not system.orchestrator or not hasattr(system.orchestrator, "llm_layer"):
+        return
+    if not hasattr(system.orchestrator.llm_layer, "providers"):
+        return
+    for provider in system.orchestrator.llm_layer.providers:
+        await _close_llm_provider(provider)
+
+
 @app.on_event("shutdown")
 async def shutdown_event():
     global system, job_processor, job_manager
     if system:
         logger.info("Encerrando sistema DEVs AI")
         try:
-            if system.orchestrator and hasattr(system.orchestrator, 'llm_layer'):
-                if hasattr(system.orchestrator.llm_layer, 'providers'):
-                    for provider in system.orchestrator.llm_layer.providers:
-                        if hasattr(provider, 'client') and hasattr(provider.client, 'close'):
-                            try:
-                                await provider.client.close()
-                            except Exception as e:
-                                logger.warning(f"Erro ao fechar cliente LLM: {str(e)}")
-                        if hasattr(provider, 'session') and provider.session:
-                            try:
-                                if not provider.session.closed:
-                                    await provider.session.close()
-                            except Exception as e:
-                                logger.warning(f"Erro ao fechar sessão LLM: {str(e)}")
+            await _cleanup_llm_resources(system)
         except Exception as e:
             logger.warning(f"Erro durante cleanup de recursos LLM: {str(e)}")
     await DatabaseConnection.close()
@@ -134,6 +152,24 @@ async def process_request(request: ProcessRequest):
         raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
 
 
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "service": "DEVs AI API",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/api/health")
+async def health_check_api():
+    return {
+        "status": "healthy",
+        "service": "DEVs AI API",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 @app.get("/api/status")
 async def get_status():
     if not system:
@@ -143,7 +179,7 @@ async def get_status():
         )
 
     try:
-        status = system.get_system_status()
+        status = await system.get_system_status()
         return {
             "status": "operational" if system.is_initialized else "initializing",
             "initialized": system.is_initialized,
@@ -230,7 +266,7 @@ async def get_job(job_id: UUID):
 
 @app.get("/api/jobs")
 async def list_jobs(
-    status: Optional[str] = Query(None, description="Filtrar por status"),
+    status: str | None = Query(None, description="Filtrar por status"),
     limit: int = Query(100, ge=1, le=1000, description="Limite de resultados"),
     offset: int = Query(0, ge=0, description="Offset para paginação"),
 ):
@@ -283,7 +319,7 @@ async def download_job(job_id: UUID):
         raise HTTPException(status_code=404, detail="Caminho do projeto não encontrado")
 
     try:
-        archive_path = create_archive(project_path)
+        archive_path = await create_archive(project_path)
         return FileResponse(
             archive_path,
             media_type="application/zip",
@@ -313,4 +349,3 @@ async def root():
             },
         },
     }
-

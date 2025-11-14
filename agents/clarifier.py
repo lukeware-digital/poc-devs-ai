@@ -19,7 +19,7 @@ class Agent1_Clarificador(BaseAgent):
 
         # Carrega template especializado
         template_base = self._build_prompt("clarifier", {})
-        
+
         prompt = f"""
 {template_base}
 

@@ -18,7 +18,7 @@ class Agent3_Arquiteto(BaseAgent):
 
         # Carrega template especializado
         template_base = self._build_prompt("architect", {})
-        
+
         prompt = f"""
 {template_base}
 

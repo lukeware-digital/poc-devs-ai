@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime
-from typing import Dict, Optional
 
 logger = logging.getLogger("DEVs_AI")
 
@@ -104,7 +103,7 @@ class BaseAgent:
             "last_execution": self.metrics["last_execution"],
         }
 
-    def _get_language_config(self) -> Dict:
+    def _get_language_config(self) -> dict:
         """
         Obtém a configuração de especialização de linguagem.
         """
@@ -117,18 +116,19 @@ class BaseAgent:
         """
         if self._prompt_loader is None:
             from utils.prompt_loader import PromptLoader
+
             config = getattr(self.shared_context, "config", {})
             self._prompt_loader = PromptLoader(config)
         return self._prompt_loader
 
-    def _build_prompt(self, template_name: str, context: Dict) -> str:
+    def _build_prompt(self, template_name: str, context: dict) -> str:
         """
         Constrói um prompt usando templates parametrizados.
-        
+
         Args:
             template_name: Nome da seção do template (ex: 'developer', 'architect')
             context: Dicionário com valores adicionais para substituição no template
-            
+
         Returns:
             Prompt formatado com placeholders substituídos
         """

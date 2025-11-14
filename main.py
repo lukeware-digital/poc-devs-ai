@@ -63,17 +63,20 @@ class DEVsAISystem:
             'Redis': {
                 'host_key': 'redis_host',
                 'port_key': 'redis_port',
-                'test': self._test_redis
+                'test': self._test_redis,
+                'required': True
             },
             'ChromaDB': {
                 'host_key': 'chroma_host',
                 'port_key': 'chroma_port',
-                'test': self._test_chromadb
+                'test': self._test_chromadb,
+                'required': True
             },
             'Ollama': {
                 'host_key': 'ollama_host',
                 'port_key': None,
-                'test': self._test_ollama
+                'test': self._test_ollama,
+                'required': False
             }
         }
         
@@ -85,8 +88,11 @@ class DEVsAISystem:
                 logger.warning(f"⚠️ Configuração faltando para {service_name}: {e}")
                 # Continua mesmo se a configuração estiver faltando
             except Exception as e:
-                logger.error(f"❌ Falha na conexão com {service_name}: {str(e)}")
-                raise
+                if config.get('required', True):
+                    logger.error(f"❌ Falha na conexão com {service_name}: {str(e)}")
+                    raise
+                else:
+                    logger.warning(f"⚠️ {service_name} não está disponível: {str(e)}. O sistema continuará, mas funcionalidades que dependem deste serviço podem não funcionar.")
     
     async def _test_redis(self, service_name: str, config: Dict[str, Any]) -> None:
         """Testa conectividade com Redis"""
@@ -107,14 +113,19 @@ class DEVsAISystem:
     async def _test_ollama(self, service_name: str, config: Dict[str, Any]) -> None:
         """Testa conectividade com Ollama"""
         import aiohttp
+        from aiohttp import ClientConnectorError, ClientError
+        
         host = self.config.get(config['host_key'], 'localhost:11434')
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"http://{host}/api/tags",
-                timeout=aiohttp.ClientTimeout(total=5)
-            ) as response:
-                if response.status != 200:
-                    raise Exception(f"Ollama retornou status {response.status}")
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"http://{host}/api/tags",
+                    timeout=aiohttp.ClientTimeout(total=5)
+                ) as response:
+                    if response.status != 200:
+                        raise Exception(f"Ollama retornou status {response.status}")
+        except (ClientConnectorError, ClientError, asyncio.TimeoutError) as e:
+            raise ConnectionError(f"Não foi possível conectar ao Ollama em {host}: {str(e)}")
                 
     async def _preload_common_prompts(self):
         """Pré-carrega prompts comuns no cache"""

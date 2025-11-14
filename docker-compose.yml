@@ -1,5 +1,6 @@
 services:
   redis-stack:
+    container_name: redis-stack
     image: redis/redis-stack:latest
     restart: no
     ports:
@@ -9,6 +10,7 @@ services:
       - db_net
 
   chromadb:
+    container_name: chromadb
     image: chromadb/chroma:0.6.3
     restart: no
     ports:
@@ -17,11 +19,12 @@ services:
       - IS_PERSISTENT=true
       - ANONYMIZED_TELEMETRY=false
     volumes:
-      - ./chroma_data:/chroma/chroma
+      - chroma_data:/chroma/chroma
     networks:
       - db_net
 
   postgres:
+    container_name: postgres
     image: postgres:alpine
     restart: no
     environment:
@@ -36,6 +39,7 @@ services:
       - db_net
 
   postgres-web:
+    container_name: postgres-web
     image: sosedoff/pgweb:latest
     restart: no
     ports:
@@ -57,15 +61,6 @@ services:
       - ollama_data:/root/.ollama
     networks:
       - db_net
-    # entrypoint: >
-    #   sh -c "
-    #   ollama serve &
-    #   sleep 2 &&
-    #   ollama pull llama3:8b-instruct-q4_0 &&
-    #   ollama pull mistral:7b-instruct-v0.2-q4_0 &&
-    #   ollama pull phi3:medium-4k-instruct-q4_0 &&
-    #   ollama pull codegemma:7b-instruct-q4_0
-    #   "
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
@@ -85,12 +80,13 @@ services:
       - ollama
 
   app:
+    container_name: devs-ai
     build: .
     ports:
       - "8080:8080"
     volumes:
-      - ./chroma_data:/app/chroma_data
-      - ./logs:/app/logs
+      - chroma_data:/app/chroma_data
+      - logs:/app/logs
     environment:
       - CHROMA_DB_HOST=chromadb
       - CHROMA_DB_PORT=8000
@@ -114,6 +110,7 @@ volumes:
   postgres_data:
   chroma_data:
   redisinsight_data:
+  logs:
 
 networks:
   db_net:

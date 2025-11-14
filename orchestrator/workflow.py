@@ -1113,10 +1113,11 @@ class DEVsAIOrchestrator:
 
         return state
 
-    async def execute_workflow(self, user_input: str) -> dict[str, any]:
+    async def execute_workflow(self, user_input: str, project_path: str | None = None) -> dict[str, any]:
         """Executa o fluxo completo do DEVs AI"""
         initial_state = ProjectState(
             last_operation={"user_input": user_input, "success": True},
+            project_path=project_path,
             timestamp=datetime.utcnow(),
         )
 

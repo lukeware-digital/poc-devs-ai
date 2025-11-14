@@ -145,7 +145,7 @@ class DEVsAISystem:
                 logger.warning(f"Falha ao pré-carregar prompt: {str(e)}")
                 # Não interrompe a inicialização se o pré-carregamento falhar
             
-    async def process_request(self, user_input: str) -> Dict[str, Any]:
+    async def process_request(self, user_input: str, project_path: Optional[str] = None) -> Dict[str, Any]:
         """Processa uma solicitação do usuário"""
         if not self.is_initialized:
             raise RuntimeError("Sistema não inicializado")
@@ -160,7 +160,7 @@ class DEVsAISystem:
         
         try:
             result = await asyncio.wait_for(
-                self.orchestrator.execute_workflow(user_input),
+                self.orchestrator.execute_workflow(user_input, project_path),
                 timeout=timeout
             )
             execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
@@ -287,34 +287,7 @@ class DEVsAISystem:
         except KeyError:
             return 'not_configured'
         except ImportError:
-            # Se requests não estiver disponível, tenta com aiohttp de forma segura
-            try:
-                import aiohttp
-                import asyncio
-                host = self.config.get('ollama_host', 'localhost:11434')
-                
-                async def check():
-                    async with aiohttp.ClientSession() as session:
-                        async with session.get(
-                            f"http://{host}/api/tags",
-                            timeout=aiohttp.ClientTimeout(total=2)
-                        ) as response:
-                            return response.status == 200
-                
-                try:
-                    loop = asyncio.get_event_loop()
-                    if loop.is_running():
-                        return 'unknown'  # Não pode fazer sync call dentro de loop ativo
-                    if asyncio.run(check()):
-                        return 'healthy'
-                    return 'unhealthy'
-                except RuntimeError:
-                    # Sem loop de evento, cria um novo
-                    if asyncio.run(check()):
-                        return 'healthy'
-                    return 'unhealthy'
-            except Exception:
-                return 'unknown'
+            return 'unknown'
         except Exception:
             return 'unhealthy'
 
@@ -328,7 +301,9 @@ async def main():
         from api.server import app
         
         logger.info("Iniciando servidor API...")
-        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+        config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_level="info")
+        server = uvicorn.Server(config)
+        await server.serve()
     else:
         from utils.hardware_detection import detect_hardware_profile
         
@@ -344,6 +319,14 @@ async def main():
             print("=" * 50)
             print("💡 Para iniciar o servidor API, execute: python main.py api")
             print("💡 Para processar solicitações, use a API REST em /api/process")
+            print("💡 Pressione Ctrl+C para encerrar")
+            
+            try:
+                while True:
+                    await asyncio.sleep(1)
+            except KeyboardInterrupt:
+                logger.info("Encerrando aplicação...")
+                sys.exit(0)
         except Exception as e:
             logger.error(f"Erro na execução: {str(e)}")
             sys.exit(1)

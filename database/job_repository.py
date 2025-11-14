@@ -1,0 +1,144 @@
+import logging
+from datetime import datetime, timezone
+from typing import Optional, List, Dict, Any
+from uuid import UUID
+import asyncpg
+
+from database.connection import DatabaseConnection
+
+logger = logging.getLogger("DEVs_AI")
+
+
+class JobRepository:
+    @staticmethod
+    async def create_job(job_data: Dict[str, Any]) -> UUID:
+        pool = await DatabaseConnection.get_pool()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO jobs (status, repository_url, project_path, user_input, progress, current_step)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING id
+                """,
+                job_data.get("status", "pending"),
+                job_data.get("repository_url"),
+                job_data.get("project_path"),
+                job_data.get("user_input"),
+                job_data.get("progress", 0.0),
+                job_data.get("current_step"),
+            )
+            return row["id"]
+
+    @staticmethod
+    async def get_job(job_id: UUID) -> Optional[Dict[str, Any]]:
+        pool = await DatabaseConnection.get_pool()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT id, status, repository_url, project_path, progress, current_step,
+                       user_input, error_message, created_at, updated_at
+                FROM jobs
+                WHERE id = $1
+                """,
+                job_id,
+            )
+            if row:
+                return dict(row)
+            return None
+
+    @staticmethod
+    async def update_job_status(
+        job_id: UUID,
+        status: Optional[str] = None,
+        progress: Optional[float] = None,
+        current_step: Optional[str] = None,
+        error_message: Optional[str] = None,
+    ):
+        pool = await DatabaseConnection.get_pool()
+        async with pool.acquire() as conn:
+            updates = []
+            params = []
+            param_idx = 1
+
+            if status is not None:
+                updates.append(f"status = ${param_idx}")
+                params.append(status)
+                param_idx += 1
+
+            if progress is not None:
+                updates.append(f"progress = ${param_idx}")
+                params.append(progress)
+                param_idx += 1
+
+            if current_step is not None:
+                updates.append(f"current_step = ${param_idx}")
+                params.append(current_step)
+                param_idx += 1
+
+            if error_message is not None:
+                updates.append(f"error_message = ${param_idx}")
+                params.append(error_message)
+                param_idx += 1
+
+            updates.append(f"updated_at = ${param_idx}")
+            params.append(datetime.now(timezone.utc))
+            param_idx += 1
+
+            params.append(job_id)
+
+            query = f"""
+                UPDATE jobs
+                SET {', '.join(updates)}
+                WHERE id = ${param_idx}
+            """
+            await conn.execute(query, *params)
+
+    @staticmethod
+    async def list_jobs(
+        status: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        pool = await DatabaseConnection.get_pool()
+        async with pool.acquire() as conn:
+            if status:
+                rows = await conn.fetch(
+                    """
+                    SELECT id, status, repository_url, project_path, progress, current_step,
+                           user_input, error_message, created_at, updated_at
+                    FROM jobs
+                    WHERE status = $1
+                    ORDER BY created_at DESC
+                    LIMIT $2 OFFSET $3
+                    """,
+                    status,
+                    limit,
+                    offset,
+                )
+            else:
+                rows = await conn.fetch(
+                    """
+                    SELECT id, status, repository_url, project_path, progress, current_step,
+                           user_input, error_message, created_at, updated_at
+                    FROM jobs
+                    ORDER BY created_at DESC
+                    LIMIT $1 OFFSET $2
+                    """,
+                    limit,
+                    offset,
+                )
+            return [dict(row) for row in rows]
+
+    @staticmethod
+    async def cancel_job(job_id: UUID):
+        pool = await DatabaseConnection.get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE jobs
+                SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+                WHERE id = $1 AND status IN ('pending', 'running')
+                """,
+                job_id,
+            )
+

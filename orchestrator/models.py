@@ -24,6 +24,7 @@ class ProjectState(BaseModel):
     last_operation: dict[str, object] = {}
     failure_count: int = 0
     recovery_attempts: int = 0
+    project_path: str | None = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:

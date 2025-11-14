@@ -77,7 +77,6 @@ class OllamaProvider(LLMProvider):
         self.model_name = model_name
         self.host = host
         self.client = ollama.AsyncClient(host=f"http://{host}")
-        self.session = aiohttp.ClientSession()
         logger.info(f"OllamaProvider inicializado com modelo {model_name} em {host}")
 
     async def generate(

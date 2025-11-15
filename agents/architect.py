@@ -2,6 +2,7 @@ import json
 import logging
 
 from agents.base_agent import BaseAgent
+from utils.json_parser import extract_json_from_response
 
 logger = logging.getLogger("devs-ai")
 
@@ -74,7 +75,7 @@ Formato JSON:
         response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
-            architecture = json.loads(response)
+            architecture = extract_json_from_response(response, model_name=self.agent_id)
 
             # Atualiza contexto compartilhado
             await self.shared_context.update_decision(

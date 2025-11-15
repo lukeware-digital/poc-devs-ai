@@ -3,6 +3,7 @@ import logging
 import os
 
 from agents.base_agent import BaseAgent
+from utils.json_parser import extract_json_from_response
 
 logger = logging.getLogger("devs-ai")
 
@@ -127,7 +128,7 @@ ESTRUTURA ESPERADA (formato JSON):
         response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
-            project_structure = json.loads(response)
+            project_structure = extract_json_from_response(response, model_name=self.agent_id)
 
             # Cria estrutura real no sistema de arquivos
             created_files = await self._create_project_structure(project_structure, capability_token)

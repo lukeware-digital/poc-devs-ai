@@ -23,6 +23,7 @@ logger = logging.getLogger("devs-ai")
 
 BORDER = "═" * 80
 
+
 async def setup_real_components(config: dict):
     """Configura todos os componentes reais necessários"""
     logger.info("=== Configurando componentes reais ===")
@@ -100,7 +101,10 @@ async def test_code_reviewer_integration():
                         "files_created_modified": [
                             {
                                 "file_path": "src/models/task.py",
-                                "content": "class Task:\n    def __init__(self):\n        self.id = None\n        self.title = None",
+                                "content": (
+                                    "class Task:\n    def __init__(self):\n        "
+                                    "self.id = None\n        self.title = None"
+                                ),
                                 "action": "create",
                             }
                         ],
@@ -184,4 +188,3 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"\n❌ Falha crítica: {str(e)}")
         sys.exit(1)
-

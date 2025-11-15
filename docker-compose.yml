@@ -61,23 +61,41 @@ services:
       - ollama_data:/root/.ollama
     networks:
       - db_net
-
-  open-webui:
-    image: ghcr.io/open-webui/open-webui:main
-    container_name: open-webui
-    restart: no
-    ports:
-      - "8383:8080"
     environment:
-      - DEFAULT_USER=admin@gmail.com
-      - DEFAULT_PASSWORD=221232
-      - OLLAMA_BASE_URL=http://ollama:11434
-    volumes:
-      - open-webui-data:/app/backend/data
-    networks:
-      - db_net
-    depends_on:
-      - ollama
+      - OLLAMA_NUM_PARALLEL=4
+      - OLLAMA_MAX_LOADED_MODELS=2
+      - OLLAMA_NUM_GPU=0
+      - OLLAMA_HOST=0.0.0.0:11434
+    deploy:
+      resources:
+        limits:
+          memory: 24G
+        reservations:
+          memory: 16G
+    shm_size: 8gb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # open-webui:
+  #   image: ghcr.io/open-webui/open-webui:main
+  #   container_name: open-webui
+  #   restart: no
+  #   ports:
+  #     - "8383:8080"
+  #   environment:
+  #     - DEFAULT_USER=admin@gmail.com
+  #     - DEFAULT_PASSWORD=221232
+  #     - OLLAMA_BASE_URL=http://ollama:11434
+  #   volumes:
+  #     - open-webui-data:/app/backend/data
+  #   networks:
+  #     - db_net
+  #   depends_on:
+  #     - ollama
 
   # app:
   #   container_name: devs-ai

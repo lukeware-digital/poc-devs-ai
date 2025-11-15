@@ -23,6 +23,7 @@ logger = logging.getLogger("devs-ai")
 
 BORDER = "═" * 80
 
+
 async def setup_real_components(config: dict):
     """Configura todos os componentes reais necessários"""
     logger.info("=== Configurando componentes reais ===")
@@ -142,7 +143,8 @@ async def test_finalizer_integration():
             if result.get("documentation_generated"):
                 logger.info("\n📋 Documentação gerada:")
                 docs = result["documentation_generated"]
-                logger.info(f"   Arquivos de documentação: {len([k for k in docs.keys() if isinstance(docs[k], dict) and 'file_path' in docs[k]])}")
+                doc_files = [k for k in docs.keys() if isinstance(docs[k], dict) and "file_path" in docs[k]]
+                logger.info(f"   Arquivos de documentação: {len(doc_files)}")
 
             if result.get("final_delivery"):
                 delivery = result["final_delivery"]
@@ -178,4 +180,3 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"\n❌ Falha crítica: {str(e)}")
         sys.exit(1)
-

@@ -110,7 +110,7 @@ class Agent2_ProductManager(BaseAgent):
             }}
         }}
 
-        IMPORTANTE: 
+        IMPORTANTE:
         - acceptance_criteria deve ser array de STRINGS, nunca objetos ou dicionários
         - definition_of_done deve ser array de STRINGS com itens específicos
         - Varie prioridades e story points baseado em análise real

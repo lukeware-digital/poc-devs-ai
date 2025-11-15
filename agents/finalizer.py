@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 
 from agents.base_agent import BaseAgent
+from utils.json_parser import extract_json_from_response
 
 logger = logging.getLogger("devs-ai")
 
@@ -224,7 +225,7 @@ RESPOSTA EM JSON (mesmo formato da implementação original):
         response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
-            correction = json.loads(response)
+            correction = extract_json_from_response(response, model_name=self.agent_id)
 
             # Aplica as correções
             await self._apply_code_changes(correction)
@@ -302,7 +303,7 @@ FORMATO JSON:
         response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
-            documentation = json.loads(response)
+            documentation = extract_json_from_response(response, model_name=self.agent_id)
             # Cria os arquivos de documentação
             for _doc_type, doc_info in documentation.items():
                 if isinstance(doc_info, dict) and "file_path" in doc_info:

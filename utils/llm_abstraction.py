@@ -4,6 +4,7 @@ Camada de Abstração LLM - Interface unificada para diferentes provedores de LL
 
 import asyncio
 import hashlib
+import inspect
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -73,11 +74,12 @@ class OllamaProvider(LLMProvider):
     Provedor Ollama para modelos locais
     """
 
-    def __init__(self, model_name: str, host: str = "localhost:11434"):
+    def __init__(self, model_name: str, host: str = "localhost:11434", stream: bool = False):
         self.model_name = model_name
         self.host = host
+        self.stream = stream
         self.client = ollama.AsyncClient(host=f"http://{host}")
-        logger.info(f"OllamaProvider inicializado com modelo {model_name} em {host}")
+        logger.info(f"OllamaProvider inicializado com modelo {model_name} em {host} (stream: {stream})")
 
     async def generate(
         self,
@@ -87,19 +89,56 @@ class OllamaProvider(LLMProvider):
         stop_sequences: list[str] = None,
     ) -> str:
         try:
-            response = await self.client.generate(
-                model=self.model_name,
-                prompt=prompt,
-                options={
-                    "temperature": temperature,
-                    "num_predict": max_tokens,
-                    "stop": stop_sequences or [],
-                    "top_p": 0.9,
-                    "repeat_penalty": 1.1,
-                },
-                stream=False,
-            )
-            response_text = response.get("response", "").strip() if response else ""
+            if self.stream:
+                response_text = ""
+                stream_response = self.client.generate(
+                    model=self.model_name,
+                    prompt=prompt,
+                    options={
+                        "temperature": temperature,
+                        "num_predict": max_tokens,
+                        "stop": stop_sequences or [],
+                        "top_p": 0.9,
+                        "repeat_penalty": 1.1,
+                    },
+                    stream=True,
+                )
+                if inspect.iscoroutine(stream_response):
+                    stream_response = await stream_response
+                async for chunk in stream_response:
+                    chunk_text = ""
+                    if hasattr(chunk, "response"):
+                        chunk_text = chunk.response or ""
+                    elif isinstance(chunk, dict):
+                        chunk_text = chunk.get("response", "")
+                    else:
+                        chunk_text = str(chunk) if chunk else ""
+                    
+                    if chunk_text:
+                        response_text += chunk_text
+                        logger.info(f"[OLLAMA STREAM] {chunk_text}")
+                
+                response_text = response_text.strip()
+            else:
+                response = await self.client.generate(
+                    model=self.model_name,
+                    prompt=prompt,
+                    options={
+                        "temperature": temperature,
+                        "num_predict": max_tokens,
+                        "stop": stop_sequences or [],
+                        "top_p": 0.9,
+                        "repeat_penalty": 1.1,
+                    },
+                    stream=False,
+                )
+
+                if hasattr(response, "response"):
+                    response_text = response.response.strip() if response.response else ""
+                elif isinstance(response, dict):
+                    response_text = response.get("response", "").strip() if response else ""
+                else:
+                    response_text = str(response).strip() if response else ""
 
             if not response_text:
                 logger.warning(f"Ollama retornou resposta vazia (modelo: {self.model_name}, host: {self.host})")
@@ -122,11 +161,21 @@ class OllamaProvider(LLMProvider):
     def get_model_info(self) -> dict[str, any]:
         try:
             info = ollama.show(self.model_name)
+            if hasattr(info, "size"):
+                size = info.size
+                details = info.details if hasattr(info, "details") else {}
+            elif isinstance(info, dict):
+                size = info.get("size", 0)
+                details = info.get("details", {})
+            else:
+                size = 0
+                details = {}
+
             return {
                 "name": self.model_name,
-                "size": info.get("size", 0),
-                "parameters": info.get("details", {}).get("parameter_size", "unknown"),
-                "family": info.get("details", {}).get("family", "unknown"),
+                "size": size,
+                "parameters": details.get("parameter_size", "unknown") if isinstance(details, dict) else "unknown",
+                "family": details.get("family", "unknown") if isinstance(details, dict) else "unknown",
             }
         except Exception as e:
             logger.error(f"Erro ao obter informações do modelo: {str(e)}")
@@ -340,29 +389,38 @@ class LLMAbstractLayer:
 
         self.capability_tokens = config.get("capability_tokens", {})
 
-        logger.info(
-            f"LLMAbstractLayer inicializado (single_agent_mode: {single_agent_mode})"
-        )
+        logger.info(f"LLMAbstractLayer inicializado (single_agent_mode: {single_agent_mode})")
+
+    def _get_ollama_config(self) -> dict:
+        """Obtém configuração do Ollama com suporte a formatos antigo e novo"""
+        ollama_config = self.config.get("ollama", {})
+        if isinstance(ollama_config, dict) and ollama_config:
+            return ollama_config
+        ollama_host = self.config.get("ollama_host", "localhost:11434")
+        return {"host": ollama_host, "enabled": True, "stream": False}
 
     def _initialize_providers(self) -> list[LLMProvider]:
         """Inicializa provedores de LLM baseado na configuração"""
         providers = []
 
         # Provedor Ollama (padrão)
-        ollama_config = self.config.get("ollama", {})
+        ollama_config = self._get_ollama_config()
         if ollama_config.get("enabled", True):
             primary_model = self.config.get("primary_model", "llama3:8b-instruct-q4_0")
+            stream_enabled = ollama_config.get("stream", False)
             providers.append(
                 OllamaProvider(
                     model_name=primary_model,
                     host=ollama_config.get("host", "localhost:11434"),
+                    stream=stream_enabled,
                 )
             )
 
         # Provedores fallback
         fallback_models = self.config.get("fallback_models", [])
+        stream_enabled = ollama_config.get("stream", False)
         for model in fallback_models:
-            providers.append(OllamaProvider(model_name=model, host=ollama_config.get("host", "localhost:11434")))
+            providers.append(OllamaProvider(model_name=model, host=ollama_config.get("host", "localhost:11434"), stream=stream_enabled))
 
         # Provedor OpenAI (se configurado)
         openai_config = self.config.get("openai", {})
@@ -390,15 +448,16 @@ class LLMAbstractLayer:
         agent_models = self.config.get("agent_models", {})
         if agent_id in agent_models:
             model_name = agent_models[agent_id]
-            ollama_config = self.config.get("ollama", {})
+            ollama_config = self._get_ollama_config()
             host = ollama_config.get("host", "localhost:11434")
+            stream_enabled = ollama_config.get("stream", False)
 
-            providers = [OllamaProvider(model_name=model_name, host=host)]
+            providers = [OllamaProvider(model_name=model_name, host=host, stream=stream_enabled)]
 
             fallback_models = self.config.get("fallback_models", [])
             for fallback_model in fallback_models:
                 if fallback_model != model_name:
-                    providers.append(OllamaProvider(model_name=fallback_model, host=host))
+                    providers.append(OllamaProvider(model_name=fallback_model, host=host, stream=stream_enabled))
 
             self.agent_providers[agent_id] = providers
             logger.info(f"Providers específicos criados para {agent_id}: {model_name}")
@@ -523,16 +582,16 @@ class LLMAbstractLayer:
     async def stop_agent_providers(self, agent_id: str = None):
         """Para os providers Ollama de um agente específico"""
         providers = []
-        
+
         if agent_id and agent_id in self.agent_providers:
             providers = self.agent_providers[agent_id]
         elif not agent_id and self._providers_initialized:
             providers = self.providers
-        
+
         for provider in providers:
             if isinstance(provider, OllamaProvider):
                 await provider.stop_model()
-        
+
         if agent_id and agent_id in self.agent_providers:
             del self.agent_providers[agent_id]
             logger.info(f"Providers do agente {agent_id} removidos após parada")

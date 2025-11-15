@@ -4,6 +4,7 @@ import logging
 import numpy as np
 
 from agents.base_agent import BaseAgent
+from utils.json_parser import extract_json_from_response
 
 logger = logging.getLogger("devs-ai")
 
@@ -177,7 +178,7 @@ RESPOSTA EM JSON:
         response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
-            review = json.loads(response)
+            review = extract_json_from_response(response, model_name=self.agent_id)
             return review
         except Exception as e:
             logger.error(f"Erro no parsing da revisão para task {task_id}: {str(e)}")

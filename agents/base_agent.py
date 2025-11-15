@@ -8,6 +8,7 @@ logger = logging.getLogger("devs-ai")
 
 BORDER = "═" * 80
 
+
 class BaseAgent:
     """
     Classe base para todos os agentes do sistema DEVs AI.

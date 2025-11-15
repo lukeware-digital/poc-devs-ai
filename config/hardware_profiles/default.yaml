@@ -5,7 +5,10 @@ redis_host: "localhost"
 redis_port: 6379
 chroma_host: "localhost"
 chroma_port: 8000
-ollama_host: "localhost:11434"
+ollama:
+  host: "localhost:11434"
+  enabled: true
+  stream: true
 # Modelos LLM
 primary_model: "phi3:mini"
 fallback_models:

@@ -3,6 +3,7 @@ import logging
 import os
 
 from agents.base_agent import BaseAgent
+from utils.json_parser import extract_json_from_response
 
 logger = logging.getLogger("devs-ai")
 
@@ -83,7 +84,7 @@ class Agent6_Desenvolvedor(BaseAgent):
         response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
-            implementation = json.loads(response)
+            implementation = extract_json_from_response(response, model_name=self.agent_id)
             await self._apply_code_changes(implementation)
             return implementation
         except Exception as e:

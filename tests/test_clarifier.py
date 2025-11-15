@@ -23,6 +23,7 @@ logger = logging.getLogger("devs-ai")
 
 BORDER = "═" * 80
 
+
 async def setup_real_components(config: dict):
     """Configura todos os componentes reais necessários"""
     logger.info("=== Configurando componentes reais ===")
@@ -94,7 +95,9 @@ async def test_clarifier_integration():
             shared_context.project_state.set("project_path", temp_dir)
 
             test_task = {
-                "user_input": "Criar uma API REST para gerenciar tarefas com autenticação JWT e banco de dados PostgreSQL",
+                "user_input": (
+                    "Criar uma API REST para gerenciar tarefas com autenticação JWT e banco de dados PostgreSQL"
+                ),
                 "operation": "requirements_analysis",
             }
 
@@ -116,12 +119,10 @@ async def test_clarifier_integration():
                 logger.info(f"   Task ID: {spec.get('task_id')}")
                 logger.info(f"   Complexidade estimada: {spec.get('estimated_complexity')}/10")
                 logger.info(f"   Critérios de aceitação: {len(spec.get('acceptance_criteria', []))} itens")
-                logger.info(
-                    f"   Requisitos funcionais: {len(spec.get('requirements_breakdown', {}).get('functional', []))} itens"
-                )
-                logger.info(
-                    f"   Requisitos não-funcionais: {len(spec.get('requirements_breakdown', {}).get('non_functional', []))} itens"
-                )
+                func_reqs = spec.get("requirements_breakdown", {}).get("functional", [])
+                logger.info(f"   Requisitos funcionais: {len(func_reqs)} itens")
+                non_func_reqs = spec.get("requirements_breakdown", {}).get("non_functional", [])
+                logger.info(f"   Requisitos não-funcionais: {len(non_func_reqs)} itens")
                 logger.info(f"   Questões de clarificação: {len(spec.get('clarification_questions', []))} itens")
 
                 if spec.get("acceptance_criteria"):

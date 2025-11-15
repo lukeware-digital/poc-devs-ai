@@ -23,6 +23,7 @@ logger = logging.getLogger("devs-ai")
 
 BORDER = "═" * 80
 
+
 async def setup_real_components(config: dict):
     """Configura todos os componentes reais necessários"""
     logger.info("=== Configurando componentes reais ===")
@@ -96,7 +97,9 @@ async def test_tech_lead_integration():
             test_task = {
                 "specification": {
                     "task_id": "test_task_001",
-                    "description": "Criar uma API REST para gerenciar tarefas com autenticação JWT e banco de dados PostgreSQL",
+                    "description": (
+                        "Criar uma API REST para gerenciar tarefas com autenticação JWT e banco de dados PostgreSQL"
+                    ),
                     "acceptance_criteria": [
                         "API deve suportar CRUD completo de tarefas",
                         "Autenticação JWT deve ser implementada",
@@ -147,7 +150,7 @@ async def test_tech_lead_integration():
                 tasks = result["technical_tasks"]
                 logger.info("\n📋 Tasks técnicas geradas:")
                 logger.info(f"   Total de tasks: {len(tasks.get('technical_tasks', []))}")
-                
+
                 if tasks.get("technical_tasks"):
                     for i, task in enumerate(tasks["technical_tasks"][:3], 1):
                         logger.info(f"\n   Task {i}:")
@@ -184,4 +187,3 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"\n❌ Falha crítica: {str(e)}")
         sys.exit(1)
-

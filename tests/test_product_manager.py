@@ -97,7 +97,9 @@ async def test_product_manager_integration():
             test_task = {
                 "specification": {
                     "task_id": "test_task_001",
-                    "description": "Criar uma API REST para gerenciar tarefas com autenticação JWT e banco de dados PostgreSQL",
+                    "description": (
+                        "Criar uma API REST para gerenciar tarefas com autenticação JWT e banco de dados PostgreSQL"
+                    ),
                     "acceptance_criteria": [
                         "API deve suportar CRUD completo de tarefas",
                         "Autenticação JWT deve ser implementada",

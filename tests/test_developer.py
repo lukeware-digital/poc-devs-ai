@@ -23,6 +23,7 @@ logger = logging.getLogger("devs-ai")
 
 BORDER = "═" * 80
 
+
 async def setup_real_components(config: dict):
     """Configura todos os componentes reais necessários"""
     logger.info("=== Configurando componentes reais ===")
@@ -176,4 +177,3 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"\n❌ Falha crítica: {str(e)}")
         sys.exit(1)
-

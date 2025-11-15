@@ -11,7 +11,7 @@ logger = logging.getLogger("devs-ai")
 class Agent5_Scaffolder(BaseAgent):
     """Agent-5: Scaffolder - Cria estrutura do projeto"""
 
-    async def _execute_task(self, task: dict[str, any]) -> dict[str, any]:
+    async def _execute_task(self, task: dict[str, any]) -> dict[str, any]:  # noqa: C901
         architecture = task["architecture"]
         technical_tasks = task["technical_tasks"]
 
@@ -137,6 +137,48 @@ ESTRUTURA ESPERADA (formato JSON):
             await self.shared_context.update_decision(
                 self.agent_id, "technical", "project_structure", project_structure, 0.95
             )
+
+            # Lê arquivo do agente anterior
+            previous_content = self._read_previous_agent_md(5)
+
+            # Gera nova seção de estrutura do projeto
+            new_section = "# ESTRUTURA DO PROJETO\n\n"
+            new_section += "## ESTRUTURA CRIADA\n\n"
+            new_section += "```\n"
+            project_path = self._get_project_path() or "."
+            structure_items = project_structure.get("project_structure", [])
+            for item in structure_items:
+                item_path = item.get("path", "")
+                item_name = item.get("name", "")
+                if item.get("type") == "directory":
+                    new_section += f"{item_path}{item_name}/\n"
+                elif item.get("type") == "file":
+                    new_section += f"{item_path}{item_name}\n"
+            new_section += "```\n\n"
+            new_section += "### Ações Realizadas\n\n"
+            new_section += "- [x] Estrutura validada\n"
+            new_section += "- [x] Novos diretórios criados\n"
+            if created_files:
+                new_section += f"- [x] {len(created_files)} arquivos/diretórios criados\n"
+            if project_structure.get("configuration_files"):
+                new_section += (
+                    f"- [x] {len(project_structure.get('configuration_files', []))} arquivos de configuração criados\n"
+                )
+            new_section += "\n"
+            if project_path:
+                new_section += f"**Endereço Pasta Projeto:** {project_path}\n\n"
+            if created_files:
+                new_section += "### Arquivos Criados\n\n"
+                for file_info in created_files[:20]:
+                    new_section += f"- {file_info}\n"
+                if len(created_files) > 20:
+                    new_section += f"- ... e mais {len(created_files) - 20} arquivos\n"
+                new_section += "\n"
+
+            md_content = self._build_accumulative_md(
+                previous_content, new_section, "ESTRUTURA DO PROJETO", 5, "Agent 4"
+            )
+            await self._save_markdown_file("agent5_estrutura.md", md_content)
 
             return {
                 "status": "success",

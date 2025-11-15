@@ -10,7 +10,7 @@ logger = logging.getLogger("devs-ai")
 class Agent2_ProductManager(BaseAgent):
     """Agent-2: Product Manager - Gera histórias de usuário"""
 
-    async def _execute_task(self, task: dict[str, any]) -> dict[str, any]:
+    async def _execute_task(self, task: dict[str, any]) -> dict[str, any]:  # noqa: C901
         specification = task["specification"]
 
         # Carrega template especializado
@@ -129,21 +129,53 @@ class Agent2_ProductManager(BaseAgent):
             # Atualiza contexto compartilhado
             await self.shared_context.update_decision(self.agent_id, "technical", "user_stories", user_stories, 0.9)
 
-            # Salva user_stories.md
-            md_content = "# User Stories\n\n"
+            # Lê arquivo do agente anterior
+            previous_content = self._read_previous_agent_md(2)
+
+            # Gera nova seção de histórias de usuário
+            new_section = "# HISTÓRIAS DE USUÁRIO\n\n"
             for story in user_stories.get("user_stories", []):
-                md_content += f"## {story.get('id', 'N/A')}\n\n"
-                md_content += f"**Description:** {story.get('description', 'N/A')}\n\n"
-                md_content += f"**Priority:** {story.get('priority', 'N/A')}\n\n"
-                md_content += f"**Story Points:** {story.get('estimated_story_points', 0)}\n\n"
-                md_content += "**Acceptance Criteria:**\n"
+                story_id = story.get("id", "N/A")
+                description = story.get("description", "N/A")
+                priority = story.get("priority", "N/A")
+                story_points = story.get("estimated_story_points", 0)
+
+                new_section += f"### {story_id}\n\n"
+                new_section += f"**{description}**\n\n"
+                new_section += f"**Prioridade:** {priority}\n"
+                new_section += f"**Story Points:** {story_points}\n\n"
+                new_section += "**Critérios de Aceitação:**\n\n"
                 for criterion in story.get("acceptance_criteria", []):
-                    md_content += f"- {criterion}\n"
-                md_content += "\n**Definition of Done:**\n"
+                    new_section += f"- [ ] {criterion}\n"
+                new_section += "\n**Definition of Done:**\n\n"
                 for item in story.get("definition_of_done", []):
-                    md_content += f"- {item}\n"
-                md_content += "\n---\n\n"
-            await self._save_markdown_file("user_stories.md", md_content)
+                    new_section += f"- [ ] {item}\n"
+                new_section += "\n---\n\n"
+
+            if user_stories.get("product_backlog"):
+                new_section += "## Product Backlog\n\n"
+                for story_id in user_stories.get("product_backlog", []):
+                    new_section += f"- {story_id}\n"
+                new_section += "\n"
+
+            if user_stories.get("release_planning"):
+                release_planning = user_stories.get("release_planning", {})
+                new_section += "## Release Planning\n\n"
+                if release_planning.get("mvp_scope"):
+                    new_section += "### MVP Scope\n\n"
+                    for story_id in release_planning.get("mvp_scope", []):
+                        new_section += f"- {story_id}\n"
+                    new_section += "\n"
+                if release_planning.get("future_enhancements"):
+                    new_section += "### Future Enhancements\n\n"
+                    for story_id in release_planning.get("future_enhancements", []):
+                        new_section += f"- {story_id}\n"
+                    new_section += "\n"
+
+            md_content = self._build_accumulative_md(
+                previous_content, new_section, "HISTÓRIAS DE USUÁRIO", 2, "Agent 1"
+            )
+            await self._save_markdown_file("agent2_historias.md", md_content)
 
             return {"status": "success", "user_stories": user_stories}
         except Exception as e:

@@ -10,7 +10,7 @@ logger = logging.getLogger("devs-ai")
 class Agent3_Arquiteto(BaseAgent):
     """Agent-3: Arquiteto - Define arquitetura do sistema"""
 
-    async def _execute_task(self, task: dict[str, any]) -> dict[str, any]:
+    async def _execute_task(self, task: dict[str, any]) -> dict[str, any]:  # noqa: C901
         spec = task["specification"]
         user_stories = task["user_stories"]
 
@@ -89,28 +89,58 @@ Formato JSON:
                 0.9,
             )
 
-            # Salva architecture.md
-            md_content = "# Architecture\n\n"
+            # Lê arquivo do agente anterior
+            previous_content = self._read_previous_agent_md(3)
+
+            # Gera nova seção de arquitetura
+            new_section = "# ARQUITETURA DO SISTEMA\n\n"
             arch_decision = architecture.get("architecture_decision", {})
-            md_content += "## Architecture Decision\n\n"
-            md_content += f"**Pattern:** {arch_decision.get('pattern', 'N/A')}\n\n"
-            md_content += f"**Rationale:** {arch_decision.get('rationale', 'N/A')}\n\n"
-            md_content += "**Alternatives Considered:**\n"
-            for alt in arch_decision.get("alternatives_considered", []):
-                md_content += f"- {alt}\n"
-            md_content += "\n## Components\n\n"
-            for component in architecture.get("components", []):
-                md_content += f"### {component.get('name', 'N/A')}\n\n"
-                md_content += f"**Responsibility:** {component.get('responsibility', 'N/A')}\n\n"
-                md_content += f"**Technology:** {component.get('technology', 'N/A')}\n\n"
-            md_content += "\n## Technology Stack\n\n"
+            new_section += "## ARQUITETURA DEFINIDA\n\n"
+            new_section += "### Diagrama de Componentes\n\n"
+            plantuml = architecture.get("plantuml_diagram", "")
+            if plantuml:
+                new_section += f"```\n{plantuml}\n```\n\n"
+            else:
+                new_section += "*Diagrama não disponível*\n\n"
+            new_section += "### Tecnologias e Frameworks\n\n"
             tech_stack = architecture.get("technology_stack", {})
             for category, techs in tech_stack.items():
-                md_content += f"### {category.title()}\n"
-                for tech in techs:
-                    md_content += f"- {tech}\n"
-                md_content += "\n"
-            await self._save_markdown_file("architecture.md", md_content)
+                category_name = category.replace("_", " ").title()
+                new_section += f"- **{category_name}:** {', '.join(techs) if techs else 'N/A'}\n"
+            new_section += "\n### Padrões Arquiteturais\n\n"
+            pattern = arch_decision.get("pattern", "N/A")
+            rationale = arch_decision.get("rationale", "N/A")
+            new_section += f"- **{pattern}** - {rationale}\n"
+            if arch_decision.get("alternatives_considered"):
+                new_section += "\n**Alternativas Consideradas:**\n"
+                for alt in arch_decision.get("alternatives_considered", []):
+                    new_section += f"- {alt}\n"
+            new_section += "\n### Componentes\n\n"
+            for component in architecture.get("components", []):
+                new_section += f"#### {component.get('name', 'N/A')}\n\n"
+                new_section += f"**Responsabilidade:** {component.get('responsibility', 'N/A')}\n\n"
+                new_section += f"**Tecnologia:** {component.get('technology', 'N/A')}\n\n"
+                if component.get("dependencies"):
+                    new_section += "**Dependências:**\n"
+                    for dep in component.get("dependencies", []):
+                        new_section += f"- {dep}\n"
+                new_section += "\n"
+            if architecture.get("communication_protocols"):
+                new_section += "### Protocolos de Comunicação\n\n"
+                for protocol in architecture.get("communication_protocols", []):
+                    new_section += f"- {protocol}\n"
+                new_section += "\n"
+            if architecture.get("quality_attributes"):
+                quality_attrs = architecture.get("quality_attributes", {})
+                new_section += "### Atributos de Qualidade\n\n"
+                for attr, value in quality_attrs.items():
+                    new_section += f"- **{attr.replace('_', ' ').title()}:** {value}\n"
+                new_section += "\n"
+
+            md_content = self._build_accumulative_md(
+                previous_content, new_section, "ARQUITETURA DO SISTEMA", 3, "Agent 2"
+            )
+            await self._save_markdown_file("agent3_arquitetura.md", md_content)
 
             return {"status": "success", "architecture": architecture}
         except Exception as e:

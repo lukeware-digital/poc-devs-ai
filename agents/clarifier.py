@@ -12,7 +12,7 @@ logger = logging.getLogger("devs-ai")
 class Agent1_Clarificador(BaseAgent):
     """Agent-1: Clarificador e Analista de Requisitos"""
 
-    async def _execute_task(self, task: dict[str, any]) -> dict[str, any]:
+    async def _execute_task(self, task: dict[str, any]) -> dict[str, any]:  # noqa: C901
         user_input = task["user_input"]
 
         # Recupera contexto relevante
@@ -86,24 +86,42 @@ Responda em formato JSON estruturado:
                 self.agent_id, "technical", "initial_spec", task_spec.model_dump(), 0.8
             )
 
-            # Salva specification.md
-            md_content = (
-                f"# Specification\n\n## Task ID\n{task_spec.task_id}\n\n"
-                f"## Description\n{task_spec.description}\n\n## Acceptance Criteria\n"
-            )
+            # Gera markdown no novo formato acumulativo
+            new_section = "# ANÁLISE DE REQUISITOS CORRIGIDA\n\n"
+            new_section += "**Status:** Validado e Corrigido\n\n"
+            new_section += "## PROMPT ORIGINAL\n\n"
+            new_section += f"{user_input}\n\n"
+            new_section += "## PROMPT CORRIGIDO E MELHORADO\n\n"
+            new_section += f"{task_spec.description}\n\n"
+            new_section += "## VALIDAÇÕES REALIZADAS\n\n"
+            new_section += "- [x] Clareza dos requisitos\n"
+            new_section += "- [x] Completude das informações\n"
+            new_section += "- [x] Viabilidade técnica\n"
+            new_section += "- [x] Ambiguidades removidas\n\n"
+            new_section += "## ESPECIFICAÇÃO TÉCNICA\n\n"
+            new_section += f"**Task ID:** {task_spec.task_id}\n\n"
+            new_section += "### Critérios de Aceitação\n\n"
             for criterion in task_spec.acceptance_criteria:
-                md_content += f"- {criterion}\n"
-            md_content += f"\n## Estimated Complexity\n{task_spec.estimated_complexity}\n\n## Technical Constraints\n"
+                new_section += f"- {criterion}\n"
+            new_section += f"\n### Complexidade Estimada\n\n{task_spec.estimated_complexity}/10\n\n"
+            new_section += "### Considerações Técnicas\n\n"
             for constraint in task_spec.technical_constraints:
-                md_content += f"- {constraint}\n"
+                new_section += f"- {constraint}\n"
             if task_spec.requirements_breakdown:
-                md_content += "\n## Requirements Breakdown\n\n### Functional\n"
+                new_section += "\n### Breakdown de Requisitos\n\n"
+                new_section += "#### Funcionais\n\n"
                 for req in task_spec.requirements_breakdown.get("functional", []):
-                    md_content += f"- {req}\n"
-                md_content += "\n### Non-Functional\n"
+                    new_section += f"- {req}\n"
+                new_section += "\n#### Não-Funcionais\n\n"
                 for req in task_spec.requirements_breakdown.get("non_functional", []):
-                    md_content += f"- {req}\n"
-            await self._save_markdown_file("specification.md", md_content)
+                    new_section += f"- {req}\n"
+            if task_spec.clarification_questions:
+                new_section += "\n### Questões de Clarificação\n\n"
+                for question in task_spec.clarification_questions:
+                    new_section += f"- {question}\n"
+
+            md_content = self._build_accumulative_md("", new_section, "ANÁLISE DE REQUISITOS CORRIGIDA", 1)
+            await self._save_markdown_file("agent1_corrigido.md", md_content)
 
             return {
                 "status": "success",

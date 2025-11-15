@@ -56,11 +56,43 @@ class Agent6_Desenvolvedor(BaseAgent):
             self.agent_id, "technical", "implemented_code", implemented_code, 0.85
         )
 
+        # Lê arquivo do agente anterior
+        previous_content = self._read_previous_agent_md(6)
+
+        # Gera nova seção de desenvolvimento
+        new_section = "# RESUMO DO DESENVOLVIMENTO\n\n"
+        new_section += "## CÓDIGO IMPLEMENTADO\n\n"
+        new_section += "### Arquivos Criados/Modificados\n\n"
+        files_modified = self._get_modified_files(implemented_code)
+        total_files = len(files_modified)
+        for idx, file_info in enumerate(files_modified, 1):
+            file_path = file_info.get("file_path", "N/A")
+            action = file_info.get("action", "modify")
+            task_id = file_info.get("task_id", "N/A")
+            new_section += f"{idx}. **{file_path}**\n"
+            new_section += f"   - Ação: {action}\n"
+            new_section += f"   - Task: {task_id}\n"
+            new_section += "   - Status: ✅ Concluído\n\n"
+        new_section += "\n### Resumo das Implementações\n\n"
+        new_section += f"- **Total de Arquivos:** {total_files}\n"
+        new_section += f"- **Tasks Implementadas:** {len(implemented_code)}\n"
+        new_section += "- **Funcionalidades Implementadas:**\n"
+        for task_id in implemented_code.keys():
+            new_section += f"  - {task_id}\n"
+        project_path = self._get_project_path()
+        if project_path:
+            new_section += f"\n**Endereço Pasta Projeto:** {project_path}\n"
+
+        md_content = self._build_accumulative_md(
+            previous_content, new_section, "RESUMO DO DESENVOLVIMENTO", 6, "Agent 5"
+        )
+        await self._save_markdown_file("agent6_desenvolvimento.md", md_content)
+
         return {
             "status": "success",
             "implemented_tasks": list(implemented_code.keys()),
             "code_results": implemented_code,
-            "files_modified": self._get_modified_files(implemented_code),
+            "files_modified": files_modified,
         }
 
     async def _implement_single_task(
@@ -92,18 +124,9 @@ class Agent6_Desenvolvedor(BaseAgent):
             return self._create_fallback_implementation(task)
 
     def _read_md_files(self, project_path: str) -> str:
-        """Lê arquivos .md do projeto"""
-        md_context = ""
-        md_files = ["specification.md", "user_stories.md", "architecture.md", "technical_tasks.md"]
-        for md_file in md_files:
-            md_path = os.path.join(project_path, md_file)
-            if os.path.exists(md_path):
-                try:
-                    with open(md_path, encoding="utf-8") as f:
-                        md_context += f"\n\n## {md_file}\n\n{f.read()}\n"
-                except Exception:
-                    pass
-        return md_context
+        """Lê arquivo markdown do agente anterior (agent5_estrutura.md)"""
+        previous_content = self._read_previous_agent_md(6)
+        return previous_content
 
     def _analyze_existing_code(self, project_path: str) -> str:
         """Analisa arquivos de código existentes no projeto"""

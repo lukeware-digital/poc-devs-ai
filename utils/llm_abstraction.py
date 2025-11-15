@@ -81,7 +81,7 @@ class OllamaProvider(LLMProvider):
         self.client = ollama.AsyncClient(host=f"http://{host}")
         logger.info(f"OllamaProvider inicializado com modelo {model_name} em {host} (stream: {stream})")
 
-    async def generate(
+    async def generate(  # noqa: C901
         self,
         prompt: str,
         temperature: float = 0.7,
@@ -113,11 +113,11 @@ class OllamaProvider(LLMProvider):
                         chunk_text = chunk.get("response", "")
                     else:
                         chunk_text = str(chunk) if chunk else ""
-                    
+
                     if chunk_text:
                         response_text += chunk_text
                         logger.info(f"[OLLAMA STREAM] {chunk_text}")
-                
+
                 response_text = response_text.strip()
             else:
                 response = await self.client.generate(
@@ -420,7 +420,11 @@ class LLMAbstractLayer:
         fallback_models = self.config.get("fallback_models", [])
         stream_enabled = ollama_config.get("stream", False)
         for model in fallback_models:
-            providers.append(OllamaProvider(model_name=model, host=ollama_config.get("host", "localhost:11434"), stream=stream_enabled))
+            providers.append(
+                OllamaProvider(
+                    model_name=model, host=ollama_config.get("host", "localhost:11434"), stream=stream_enabled
+                )
+            )
 
         # Provedor OpenAI (se configurado)
         openai_config = self.config.get("openai", {})

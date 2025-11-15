@@ -19,26 +19,26 @@ def _extract_json_by_balance(text: str) -> str:
     start = text.find("{")
     if start == -1:
         return text
-    
+
     depth = 0
     in_string = False
     escape_next = False
-    
+
     for i in range(start, len(text)):
         char = text[i]
-        
+
         if escape_next:
             escape_next = False
             continue
-        
+
         if char == "\\":
             escape_next = True
             continue
-        
+
         if char == '"' and not escape_next:
             in_string = not in_string
             continue
-        
+
         if not in_string:
             if char == "{":
                 depth += 1
@@ -46,37 +46,37 @@ def _extract_json_by_balance(text: str) -> str:
                 depth -= 1
                 if depth == 0:
                     return text[start : i + 1]
-    
+
     return text[start:]
 
 
-def _fix_json_strings(json_str: str) -> str:
+def _fix_json_strings(json_str: str) -> str:  # noqa: C901
     result = []
     i = 0
     in_string = False
     escape_next = False
-    
+
     while i < len(json_str):
         char = json_str[i]
-        
+
         if escape_next:
             result.append(char)
             escape_next = False
             i += 1
             continue
-        
+
         if char == "\\":
             result.append(char)
             escape_next = True
             i += 1
             continue
-        
+
         if char == '"':
             result.append(char)
             in_string = not in_string
             i += 1
             continue
-        
+
         if in_string:
             if char == "\n":
                 result.append("\\n")
@@ -97,9 +97,9 @@ def _fix_json_strings(json_str: str) -> str:
                 pass
             else:
                 result.append(char)
-        
+
         i += 1
-    
+
     return "".join(result)
 
 
@@ -136,7 +136,7 @@ class JSONParseError(Exception):
 def _clean_json_string(json_str: str) -> str:
     json_str = _remove_invalid_control_chars(json_str)
     json_str = _fix_json_strings(json_str)
-    json_str = re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]', '', json_str)
+    json_str = re.sub(r"[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]", "", json_str)
     return json_str.strip()
 
 
@@ -165,18 +165,18 @@ def extract_json_from_response(response: str, model_name: str | None = None) -> 
 
     try:
         return json.loads(json_str)
-    except json.JSONDecodeError as e1:
+    except json.JSONDecodeError:
         try:
-            json_str = re.sub(r',\s*}', '}', json_str)
-            json_str = re.sub(r',\s*]', ']', json_str)
-            json_str = re.sub(r'[\x00-\x1F\x7F]', '', json_str)
+            json_str = re.sub(r",\s*}", "}", json_str)
+            json_str = re.sub(r",\s*]", "]", json_str)
+            json_str = re.sub(r"[\x00-\x1F\x7F]", "", json_str)
             return json.loads(json_str)
-        except json.JSONDecodeError as e2:
+        except json.JSONDecodeError:
             try:
                 json_str = _extract_json_by_balance(response)
                 json_str = _clean_json_string(json_str)
-                json_str = re.sub(r',\s*}', '}', json_str)
-                json_str = re.sub(r',\s*]', ']', json_str)
+                json_str = re.sub(r",\s*}", "}", json_str)
+                json_str = re.sub(r",\s*]", "]", json_str)
                 return json.loads(json_str)
             except json.JSONDecodeError as e3:
                 raise JSONParseError(

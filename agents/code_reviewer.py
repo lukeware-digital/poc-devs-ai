@@ -12,7 +12,7 @@ logger = logging.getLogger("devs-ai")
 class Agent7_CodeReviewer(BaseAgent):
     """Agent-7: Code Reviewer - Revisa código gerado"""
 
-    async def _execute_task(self, task: dict[str, any]) -> dict[str, any]:
+    async def _execute_task(self, task: dict[str, any]) -> dict[str, any]:  # noqa: C901
         implemented_code = task["implemented_code"]
         technical_tasks = task["technical_tasks"]
         architecture = task["architecture"]
@@ -35,37 +35,104 @@ class Agent7_CodeReviewer(BaseAgent):
         await self.shared_context.update_decision(self.agent_id, "quality", "code_review", review_results, 0.9)
         await self.shared_context.update_decision(self.agent_id, "quality", "quality_metrics", quality_metrics, 0.95)
 
-        # Salva code_review.md
-        md_content = "# Code Review\n\n"
+        # Lê arquivo do agente anterior
+        previous_content = self._read_previous_agent_md(7)
+
+        # Gera nova seção de code review
+        new_section = "# CODE REVIEW\n\n"
+        new_section += "## ANÁLISE GIT\n\n"
+        new_section += "### Arquivos Modificados\n\n"
+        project_path = self._get_project_path()
+        if project_path:
+            try:
+                import subprocess
+
+                result = subprocess.run(
+                    ["git", "diff", "--stat"],
+                    cwd=project_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    new_section += "```\n"
+                    new_section += result.stdout
+                    new_section += "```\n\n"
+                else:
+                    new_section += "*Git diff não disponível*\n\n"
+            except Exception:
+                new_section += "*Git diff não disponível*\n\n"
+        else:
+            new_section += "*Git diff não disponível*\n\n"
+
         approval_status = "✅ Approved" if self._determine_overall_approval(review_results) else "❌ Not Approved"
-        md_content += f"## Overall Approval: {approval_status}\n\n"
-        md_content += "## Quality Metrics\n\n"
-        md_content += f"- **Approval Rate:** {quality_metrics.get('approval_rate', 0):.1f}%\n"
-        md_content += f"- **Average Score:** {quality_metrics.get('average_score', 0):.2f}\n"
-        md_content += f"- **Total Issues:** {quality_metrics.get('total_issues', 0)}\n"
-        md_content += f"- **Critical Issues:** {quality_metrics.get('critical_issues', 0)}\n"
-        md_content += f"- **Quality Grade:** {quality_metrics.get('quality_grade', 'N/A')}\n\n"
-        md_content += "---\n\n"
+        new_section += f"## Overall Approval: {approval_status}\n\n"
+        new_section += "## Quality Metrics\n\n"
+        new_section += f"- **Approval Rate:** {quality_metrics.get('approval_rate', 0):.1f}%\n"
+        new_section += f"- **Average Score:** {quality_metrics.get('average_score', 0):.2f}\n"
+        new_section += f"- **Total Issues:** {quality_metrics.get('total_issues', 0)}\n"
+        new_section += f"- **Critical Issues:** {quality_metrics.get('critical_issues', 0)}\n"
+        new_section += f"- **Quality Grade:** {quality_metrics.get('quality_grade', 'N/A')}\n\n"
+
+        new_section += "## Issues Identificados\n\n"
+        critical_issues = []
+        improvement_issues = []
         for task_id, review in review_results.items():
-            md_content += f"## Review for {task_id}\n\n"
-            md_content += f"**Overall Score:** {review.get('overall_score', 0):.2f}\n"
-            md_content += f"**Approved:** {'✅ Yes' if review.get('approved', False) else '❌ No'}\n\n"
-            md_content += "### Issues Found\n\n"
             for issue in review.get("issues_found", []):
-                issue_type = issue.get("type", "N/A")
-                severity = issue.get("severity", "N/A")
-                description = issue.get("description", "N/A")
-                md_content += f"- **{issue_type}** ({severity}) - {description}\n"
-                md_content += f"  - File: {issue.get('file', 'N/A')}:{issue.get('line', 'N/A')}\n"
-                md_content += f"  - Suggestion: {issue.get('suggestion', 'N/A')}\n"
-                md_content += f"  - Priority: {issue.get('priority', 'N/A')}\n\n"
-            md_content += "### Suggested Improvements\n\n"
+                if issue.get("severity") == "critical":
+                    critical_issues.append((task_id, issue))
+                else:
+                    improvement_issues.append((task_id, issue))
+
+        if critical_issues:
+            new_section += "**CRÍTICO:**\n\n"
+            for task_id, issue in critical_issues:
+                new_section += f"- [ ] {issue.get('description', 'N/A')} ({task_id})\n"
+            new_section += "\n"
+
+        if improvement_issues:
+            new_section += "**MELHORIA:**\n\n"
+            for task_id, issue in improvement_issues[:10]:
+                new_section += f"- [ ] {issue.get('description', 'N/A')} ({task_id})\n"
+            if len(improvement_issues) > 10:
+                new_section += f"- ... e mais {len(improvement_issues) - 10} melhorias\n"
+            new_section += "\n"
+
+        new_section += "## RECOMENDAÇÕES\n\n"
+        refactorings = []
+        optimizations = []
+        bugs = []
+        for _task_id, review in review_results.items():
             for improvement in review.get("suggested_improvements", []):
-                md_content += f"- **{improvement.get('type', 'N/A')}**: {improvement.get('description', 'N/A')}\n"
-                md_content += f"  - Benefit: {improvement.get('benefit', 'N/A')}\n"
-                md_content += f"  - Effort: {improvement.get('effort', 'N/A')}\n\n"
-            md_content += "---\n\n"
-        await self._save_markdown_file("code_review.md", md_content)
+                imp_type = improvement.get("type", "")
+                if imp_type == "refactor":
+                    refactorings.append(improvement.get("description", "N/A"))
+                elif imp_type == "optimize":
+                    optimizations.append(improvement.get("description", "N/A"))
+            for issue in review.get("issues_found", []):
+                if issue.get("type") == "bug":
+                    bugs.append(issue.get("description", "N/A"))
+
+        if refactorings:
+            new_section += "1. **Refatoração Necessária:**\n"
+            for ref in refactorings[:5]:
+                new_section += f"   - {ref}\n"
+            new_section += "\n"
+
+        if optimizations:
+            new_section += "2. **Otimizações:**\n"
+            for opt in optimizations[:5]:
+                new_section += f"   - {opt}\n"
+            new_section += "\n"
+
+        if bugs:
+            new_section += "3. **Bugs a Corrigir:**\n"
+            for bug in bugs[:5]:
+                new_section += f"   - {bug}\n"
+            new_section += "\n"
+
+        md_content = self._build_accumulative_md(previous_content, new_section, "CODE REVIEW", 7, "Agent 6")
+        await self._save_markdown_file("agent7_review.md", md_content)
 
         return {
             "status": "success",

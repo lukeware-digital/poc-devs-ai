@@ -266,3 +266,69 @@ class BaseAgent:
         except Exception as e:
             self._logger.error(f"Erro ao salvar arquivo {filename}: {str(e)}")
             return False
+
+    def _read_previous_agent_md(self, agent_number: int) -> str:
+        """Lê o arquivo markdown do agente anterior"""
+        import os
+
+        agent_file_map = {
+            1: None,
+            2: "agent1_corrigido.md",
+            3: "agent2_historias.md",
+            4: "agent3_arquitetura.md",
+            5: "agent4_tasks.md",
+            6: "agent5_estrutura.md",
+            7: "agent6_desenvolvimento.md",
+            8: "agent7_review.md",
+        }
+
+        previous_file = agent_file_map.get(agent_number)
+        if not previous_file:
+            return ""
+
+        project_path = self._get_project_path()
+        if not project_path:
+            return ""
+
+        file_path = os.path.join(project_path, previous_file)
+        if not os.path.exists(file_path):
+            self._logger.warning(f"Arquivo anterior não encontrado: {previous_file}")
+            return ""
+
+        try:
+            with open(file_path, encoding="utf-8") as f:
+                content = f.read()
+            self._logger.info(f"Arquivo {previous_file} lido com sucesso")
+            return content
+        except Exception as e:
+            self._logger.error(f"Erro ao ler arquivo {previous_file}: {str(e)}")
+            return ""
+
+    def _build_accumulative_md(
+        self,
+        previous_content: str,
+        new_section: str,
+        agent_name: str,
+        agent_number: int,
+        previous_agent_name: str = None,
+    ) -> str:
+        """Constrói markdown acumulativo incluindo conteúdo anterior e nova seção"""
+        from datetime import datetime
+
+        date_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+
+        md_content = f"# {agent_name}\n\n"
+        md_content += f"**Data:** {date_str}\n\n"
+
+        if previous_agent_name:
+            md_content += f"**Agente Anterior:** {previous_agent_name}\n\n"
+
+        if previous_content:
+            md_content += "---\n\n"
+            md_content += "## CONTEÚDO DO AGENTE ANTERIOR\n\n"
+            md_content += previous_content
+            md_content += "\n\n---\n\n"
+
+        md_content += new_section
+
+        return md_content

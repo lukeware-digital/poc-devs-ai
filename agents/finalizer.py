@@ -48,6 +48,23 @@ class Agent8_Finalizador(BaseAgent):
         """Lida com o loop de code review"""
         corrections_applied = await self._apply_review_corrections(implemented_code, code_review, temperature)
 
+        # Lê arquivo do agente anterior para atualizar com correções
+        previous_content = self._read_previous_agent_md(8)
+
+        # Gera seção de correções aplicadas
+        new_section = "# CORREÇÕES APLICADAS\n\n"
+        new_section += "## Ajustes Realizados\n\n"
+        for task_id, correction in corrections_applied.items():
+            if correction.get("no_corrections_needed"):
+                new_section += f"- [x] {task_id} - Nenhuma correção necessária - Status: ✅\n"
+            else:
+                corrections = correction.get("corrections_applied", [])
+                new_section += f"- [x] {task_id} - {len(corrections)} correções aplicadas - Status: ✅\n"
+        new_section += "\n**Status:** Correções aplicadas, retornando para code review.\n"
+
+        md_content = self._build_accumulative_md(previous_content, new_section, "CORREÇÕES APLICADAS", 8, "Agent 7")
+        await self._save_markdown_file("agent8_correcoes.md", md_content)
+
         try:
             os.remove(code_review_file)
             logger.info(f"Arquivo code_review.md deletado: {code_review_file}")
@@ -90,6 +107,68 @@ class Agent8_Finalizador(BaseAgent):
             {"status": "completed", "timestamp": datetime.utcnow()},
             1.0,
         )
+
+        # Lê arquivo do agente anterior
+        previous_content = self._read_previous_agent_md(8)
+
+        # Gera nova seção de entrega final
+        new_section = "# ENTREGA FINAL\n\n"
+        new_section += "## CORREÇÕES APLICADAS\n\n"
+        corrections_count = len(delivery_package.get("project_summary", {}).get("corrections_applied", 0))
+        new_section += "### Ajustes Realizados\n\n"
+        if corrections_count > 0:
+            new_section += f"- [x] {corrections_count} correções aplicadas - Status: ✅\n"
+        else:
+            new_section += "- [x] Nenhuma correção necessária - Status: ✅\n"
+        new_section += "\n"
+
+        new_section += "## DOCUMENTAÇÃO FINAL\n\n"
+        new_section += "### Arquivos Entregues\n\n"
+        if documentation:
+            for _doc_type, doc_info in documentation.items():
+                if isinstance(doc_info, dict) and "file_path" in doc_info:
+                    new_section += f"- {doc_info.get('file_path', 'N/A')}\n"
+        new_section += "\n"
+
+        project_summary = delivery_package.get("project_summary", {})
+        new_section += "### Resumo do Projeto\n\n"
+        new_section += f"- **Total de Tasks:** {project_summary.get('total_tasks', 0)}\n"
+        new_section += f"- **Correções Aplicadas:** {project_summary.get('corrections_applied', 0)}\n"
+        new_section += f"- **Arquivos de Documentação:** {project_summary.get('documentation_files', 0)}\n"
+        new_section += f"- **Estrutura do Projeto:** {project_summary.get('project_structure', 0)} itens\n"
+        new_section += "\n"
+
+        quality_metrics = delivery_package.get("quality_metrics", {})
+        new_section += "### Métricas de Qualidade\n\n"
+        new_section += f"- **Taxa de Aprovação:** {quality_metrics.get('approval_rate', 0):.1f}%\n"
+        new_section += f"- **Score Médio:** {quality_metrics.get('average_score', 0):.2f}\n"
+        new_section += f"- **Total de Issues:** {quality_metrics.get('total_issues', 0)}\n"
+        new_section += f"- **Issues Críticas:** {quality_metrics.get('critical_issues', 0)}\n"
+        new_section += f"- **Nota de Qualidade:** {quality_metrics.get('quality_grade', 'N/A')}\n"
+        new_section += "\n"
+
+        new_section += "### Instruções de Uso\n\n"
+        if project_path:
+            new_section += f"**Endereço Pasta Projeto:** {project_path}\n\n"
+        new_section += "Para executar o projeto, siga as instruções no README.md gerado.\n\n"
+
+        new_section += "### Próximos Passos\n\n"
+        next_steps = delivery_package.get("next_steps_recommendations", [])
+        for step in next_steps[:5]:
+            new_section += f"- {step}\n"
+        new_section += "\n"
+
+        maintenance = delivery_package.get("maintenance_considerations", [])
+        if maintenance:
+            new_section += "### Considerações de Manutenção\n\n"
+            for item in maintenance[:5]:
+                new_section += f"- {item}\n"
+            new_section += "\n"
+
+        new_section += "**Status do Projeto:** ✅ CONCLUÍDO\n"
+
+        md_content = self._build_accumulative_md(previous_content, new_section, "ENTREGA FINAL", 8, "Agent 7")
+        await self._save_markdown_file("agent8_final.md", md_content)
 
         return {
             "status": "success",

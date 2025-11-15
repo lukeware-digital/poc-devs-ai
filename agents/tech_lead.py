@@ -10,7 +10,7 @@ logger = logging.getLogger("devs-ai")
 class Agent4_TechLead(BaseAgent):
     """Agent-4: Tech Lead - Define tasks técnicas e stack detalhada"""
 
-    async def _execute_task(self, task: dict[str, any]) -> dict[str, any]:
+    async def _execute_task(self, task: dict[str, any]) -> dict[str, any]:  # noqa: C901
         spec = task["specification"]
         architecture = task["architecture"]
         user_stories = task["user_stories"]
@@ -140,19 +140,82 @@ Formato JSON:
                 ["task_creation", "stack_definition"],
             )
 
-            # Salva technical_tasks.md
-            md_content = "# Technical Tasks\n\n"
+            # Lê arquivo do agente anterior
+            previous_content = self._read_previous_agent_md(4)
+
+            # Gera nova seção de tasks técnicas
+            new_section = "# TASKS TÉCNICAS DETALHADAS\n\n"
+            new_section += "## TASKS TÉCNICAS\n\n"
             for task in technical_plan.get("technical_tasks", []):
-                md_content += f"## {task.get('task_id', 'N/A')}\n\n"
-                md_content += f"**Description:** {task.get('description', 'N/A')}\n\n"
-                md_content += f"**Type:** {task.get('type', 'N/A')}\n\n"
-                md_content += f"**Complexity:** {task.get('complexity', 'N/A')}\n\n"
-                md_content += f"**Estimated Hours:** {task.get('estimated_hours', 0)}\n\n"
-                md_content += "**Acceptance Criteria:**\n"
+                task_id = task.get("task_id", "N/A")
+                description = task.get("description", "N/A")
+                task_type = task.get("type", "N/A")
+                complexity = task.get("complexity", "N/A")
+                estimated_hours = task.get("estimated_hours", 0)
+
+                new_section += f"### {task_id}\n\n"
+                new_section += f"**Descrição:** {description}\n\n"
+                new_section += f"- **Complexidade:** {complexity}\n"
+                new_section += f"- **Tempo Estimado:** {estimated_hours} horas\n"
+                new_section += f"- **Tipo:** {task_type}\n"
+                if task.get("dependencies"):
+                    new_section += f"- **Dependências:** {', '.join(task.get('dependencies', []))}\n"
+                new_section += "\n**Critérios de Conclusão:**\n\n"
                 for criterion in task.get("acceptance_criteria", []):
-                    md_content += f"- {criterion}\n"
-                md_content += "\n---\n\n"
-            await self._save_markdown_file("technical_tasks.md", md_content)
+                    new_section += f"- [ ] {criterion}\n"
+                new_section += "\n"
+                if task.get("technology_specifics"):
+                    tech_specs = task.get("technology_specifics", {})
+                    new_section += "**Especificações Técnicas:**\n"
+                    if tech_specs.get("libraries"):
+                        new_section += f"- Bibliotecas: {', '.join(tech_specs.get('libraries', []))}\n"
+                    if tech_specs.get("frameworks"):
+                        new_section += f"- Frameworks: {', '.join(tech_specs.get('frameworks', []))}\n"
+                    if tech_specs.get("tools"):
+                        new_section += f"- Ferramentas: {', '.join(tech_specs.get('tools', []))}\n"
+                    new_section += "\n"
+                if task.get("risk_assessment"):
+                    risk = task.get("risk_assessment", {})
+                    new_section += (
+                        f"**Risco:** {risk.get('level', 'N/A')} - {risk.get('mitigation_strategy', 'N/A')}\n\n"
+                    )
+                new_section += "---\n\n"
+
+            if technical_plan.get("technology_stack_detailed"):
+                new_section += "## Stack Tecnológica Detalhada\n\n"
+                tech_stack = technical_plan.get("technology_stack_detailed", {})
+                for category, techs in tech_stack.items():
+                    category_name = category.replace("_", " ").title()
+                    new_section += f"- **{category_name}:** {', '.join(techs) if techs else 'N/A'}\n"
+                new_section += "\n"
+
+            if technical_plan.get("development_workflow"):
+                workflow = technical_plan.get("development_workflow", {})
+                new_section += "## Workflow de Desenvolvimento\n\n"
+                if workflow.get("branch_strategy"):
+                    new_section += f"- **Branch Strategy:** {workflow.get('branch_strategy')}\n"
+                if workflow.get("code_review_process"):
+                    new_section += "- **Code Review Process:**\n"
+                    for item in workflow.get("code_review_process", []):
+                        new_section += f"  - {item}\n"
+                if workflow.get("testing_strategy"):
+                    new_section += "- **Testing Strategy:**\n"
+                    for item in workflow.get("testing_strategy", []):
+                        new_section += f"  - {item}\n"
+                new_section += "\n"
+
+            if technical_plan.get("technical_risks"):
+                new_section += "## Riscos Técnicos\n\n"
+                for risk in technical_plan.get("technical_risks", []):
+                    new_section += f"### {risk.get('risk', 'N/A')}\n\n"
+                    new_section += f"- **Probabilidade:** {risk.get('probability', 'N/A')}\n"
+                    new_section += f"- **Impacto:** {risk.get('impact', 'N/A')}\n"
+                    new_section += f"- **Mitigação:** {risk.get('mitigation', 'N/A')}\n\n"
+
+            md_content = self._build_accumulative_md(
+                previous_content, new_section, "TASKS TÉCNICAS DETALHADAS", 4, "Agent 3"
+            )
+            await self._save_markdown_file("agent4_tasks.md", md_content)
 
             return {
                 "status": "success",

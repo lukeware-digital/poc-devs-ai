@@ -24,7 +24,7 @@ from rag.retriever import RAGRetriever
 from shared_context.context_manager import SharedContext
 from utils.llm_manager import LLMManager
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 workflow_logger = AgentAdapter(logger, {"agent_id": "workflow"})
 
 
@@ -296,7 +296,7 @@ class DEVsAIOrchestrator:
                 metadata={"phase": phase_str},
             )
             state.current_step_id = step_id
-            
+
             if ready:
                 await StepRepository.update_step_status(step_id, "running")
             else:

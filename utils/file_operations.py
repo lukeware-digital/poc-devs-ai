@@ -15,7 +15,7 @@ from pathlib import Path
 
 import filelock
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class FileAccessError(Exception):

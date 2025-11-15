@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 import redis
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class CapabilityToken:

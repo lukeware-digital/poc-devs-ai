@@ -8,7 +8,7 @@ from enum import Enum
 
 from shared_context.context_manager import SharedContext
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class RecoveryStrategy(Enum):

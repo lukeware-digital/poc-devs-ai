@@ -10,7 +10,7 @@ from datetime import datetime
 
 import chromadb
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class RAGIndexer:

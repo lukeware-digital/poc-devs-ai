@@ -12,7 +12,7 @@ from datetime import datetime
 import aiohttp
 import ollama
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class LLMProvider(ABC):
@@ -99,9 +99,20 @@ class OllamaProvider(LLMProvider):
                 },
                 stream=False,
             )
-            return response["response"].strip()
+            response_text = response.get("response", "").strip() if response else ""
+
+            if not response_text:
+                logger.warning(f"Ollama retornou resposta vazia (modelo: {self.model_name}, host: {self.host})")
+            elif len(response_text) < 10:
+                logger.warning(
+                    f"Ollama retornou resposta muito curta ({len(response_text)} caracteres) "
+                    f"(modelo: {self.model_name}, host: {self.host}). "
+                    f"Primeiros caracteres: {response_text[:100]}"
+                )
+
+            return response_text
         except Exception as e:
-            logger.error(f"Erro ao gerar resposta com Ollama: {str(e)}")
+            logger.error(f"Erro ao gerar resposta com Ollama (modelo: {self.model_name}, host: {self.host}): {str(e)}")
             raise
 
     async def batch_generate(self, prompts: list[str], temperature: float = 0.7, max_tokens: int = 2048) -> list[str]:
@@ -125,6 +136,32 @@ class OllamaProvider(LLMProvider):
                 "parameters": "unknown",
                 "family": "unknown",
             }
+
+    async def stop_model(self) -> bool:
+        try:
+            async with aiohttp.ClientSession() as session:
+                base_url = f"http://{self.host}"
+                async with session.get(f"{base_url}/api/ps", timeout=5) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        processes = data.get("processes", [])
+                        for process in processes:
+                            if process.get("model") == self.model_name:
+                                try:
+                                    async with session.delete(
+                                        f"{base_url}/api/generate",
+                                        json={"model": self.model_name},
+                                        timeout=2,
+                                    ) as resp:
+                                        await resp.read()
+                                    logger.info(f"Modelo Ollama {self.model_name} parado com sucesso")
+                                    return True
+                                except Exception as e:
+                                    logger.warning(f"Erro ao parar modelo {self.model_name}: {str(e)}")
+            return False
+        except Exception as e:
+            logger.warning(f"Erro ao parar modelo Ollama {self.model_name}: {str(e)}")
+            return False
 
 
 class OpenAIProvider(LLMProvider):
@@ -286,7 +323,7 @@ class LLMAbstractLayer:
 
     def __init__(self, config: dict[str, any]):
         self.config = config
-        self.providers = self._initialize_providers()
+        self.providers = []
         cache_ttl = config.get("performance", {}).get("cache_ttl", 3600)
         single_agent_mode = config.get("orchestrator", {}).get("single_agent_mode", True)
 
@@ -299,12 +336,12 @@ class LLMAbstractLayer:
         self.current_provider_idx = 0
         self.agent_providers = {}
         self.single_agent_mode = single_agent_mode
+        self._providers_initialized = False
 
         self.capability_tokens = config.get("capability_tokens", {})
 
         logger.info(
-            f"LLMAbstractLayer inicializado com {len(self.providers)} provedores "
-            f"(single_agent_mode: {single_agent_mode})"
+            f"LLMAbstractLayer inicializado (single_agent_mode: {single_agent_mode})"
         )
 
     def _initialize_providers(self) -> list[LLMProvider]:
@@ -342,6 +379,9 @@ class LLMAbstractLayer:
     def _get_providers_for_agent(self, agent_id: str = None) -> list[LLMProvider]:
         """Retorna providers específicos para um agente ou providers padrão"""
         if not agent_id:
+            if not self._providers_initialized:
+                self.providers = self._initialize_providers()
+                self._providers_initialized = True
             return self.providers
 
         if agent_id in self.agent_providers:
@@ -364,6 +404,9 @@ class LLMAbstractLayer:
             logger.info(f"Providers específicos criados para {agent_id}: {model_name}")
             return providers
 
+        if not self._providers_initialized:
+            self.providers = self._initialize_providers()
+            self._providers_initialized = True
         return self.providers
 
     def _is_valid_response(self, response: str) -> bool:
@@ -477,10 +520,31 @@ class LLMAbstractLayer:
         tasks = [self.generate_response(prompt, temperature, max_tokens, agent_id=agent_id) for prompt in prompts]
         return await asyncio.gather(*tasks)
 
+    async def stop_agent_providers(self, agent_id: str = None):
+        """Para os providers Ollama de um agente específico"""
+        providers = []
+        
+        if agent_id and agent_id in self.agent_providers:
+            providers = self.agent_providers[agent_id]
+        elif not agent_id and self._providers_initialized:
+            providers = self.providers
+        
+        for provider in providers:
+            if isinstance(provider, OllamaProvider):
+                await provider.stop_model()
+        
+        if agent_id and agent_id in self.agent_providers:
+            del self.agent_providers[agent_id]
+            logger.info(f"Providers do agente {agent_id} removidos após parada")
+
     def get_system_status(self) -> dict[str, any]:
         """
         Retorna status do sistema LLM
         """
+        if not self._providers_initialized:
+            self.providers = self._initialize_providers()
+            self._providers_initialized = True
+
         provider_statuses = []
         for provider in self.providers:
             try:
@@ -501,8 +565,15 @@ class LLMAbstractLayer:
                     }
                 )
 
+        current_provider_name = "unknown"
+        if self.providers and self.current_provider_idx < len(self.providers):
+            try:
+                current_provider_name = self.providers[self.current_provider_idx].get_model_info()["name"]
+            except Exception:
+                pass
+
         return {
-            "current_provider": self.providers[self.current_provider_idx].get_model_info()["name"],
+            "current_provider": current_provider_name,
             "providers": provider_statuses,
             "cache_stats": self.cache.get_stats(),
             "capability_tokens": len(self.capability_tokens),

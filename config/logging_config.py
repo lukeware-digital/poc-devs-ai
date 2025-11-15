@@ -15,7 +15,7 @@ class AgentFormatter(logging.Formatter):
 
 
 def setup_logging(level: int = logging.INFO) -> logging.Logger:
-    logger = logging.getLogger("DEVs_AI")
+    logger = logging.getLogger("devs-ai")
     logger.setLevel(level)
 
     if logger.handlers:

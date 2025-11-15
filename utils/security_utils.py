@@ -10,7 +10,7 @@ import os
 import re
 import time
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 def sanitize_input(input_str: str, max_length: int = 10000) -> str:

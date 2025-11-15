@@ -4,7 +4,7 @@ from pathlib import Path
 
 import asyncpg
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class MigrationManager:

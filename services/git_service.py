@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 from git import Repo
 from git.exc import GitCommandError
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 AGENT_CONFIG = {
     "agent1": {

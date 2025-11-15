@@ -4,7 +4,7 @@ from uuid import UUID
 
 from database.job_repository import JobRepository
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class JobManager:

@@ -4,7 +4,7 @@ import logging
 import aiohttp
 import ollama
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class LLMManager:

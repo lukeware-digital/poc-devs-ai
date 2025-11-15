@@ -17,7 +17,7 @@ from config.constants import (
 
 from .capability_tokens import CapabilityTokenManager
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class GuardrailSystem:

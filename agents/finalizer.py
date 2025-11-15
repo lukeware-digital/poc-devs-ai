@@ -5,7 +5,7 @@ from datetime import datetime
 
 from agents.base_agent import BaseAgent
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class Agent8_Finalizador(BaseAgent):

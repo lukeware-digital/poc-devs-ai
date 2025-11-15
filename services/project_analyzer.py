@@ -5,7 +5,7 @@ from typing import Any
 
 from git import Repo
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class ProjectAnalyzer:

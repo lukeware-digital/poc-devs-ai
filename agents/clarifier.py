@@ -4,8 +4,9 @@ import logging
 
 from agents.base_agent import BaseAgent
 from models.task_specification import TaskSpecification
+from utils.json_parser import JSONParseError, extract_json_from_response
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class Agent1_Clarificador(BaseAgent):
@@ -53,8 +54,20 @@ Responda em formato JSON estruturado:
 
         response = await self._generate_llm_response(prompt, temperature=temperature)
 
+        model_name = None
         try:
-            spec = json.loads(response)
+            if self._llm_initialized and hasattr(self, "llm"):
+                providers = self.llm._get_providers_for_agent(self.agent_id)
+                if providers:
+                    model_info = providers[0].get_model_info()
+                    model_name = model_info.get("name") if model_info else None
+        except Exception:
+            pass
+
+        logger.debug(f"Resposta recebida (tamanho: {len(response) if response else 0} caracteres)")
+
+        try:
+            spec = extract_json_from_response(response, model_name=model_name)
             task_spec = TaskSpecification(
                 task_id=task.get(
                     "task_id",
@@ -97,9 +110,8 @@ Responda em formato JSON estruturado:
                 "specification": task_spec.model_dump(),
                 "clarification_questions": spec.get("clarification_questions", []),
             }
-        except Exception as e:
-            # Fallback para validação
-            logger.warning(f"Falha no parsing da resposta. Erro: {str(e)}")
+        except JSONParseError as e:
+            logger.error(f"Erro detalhado no parsing JSON: {str(e)}")
             corrected_spec = self._fallback_spec_creation(user_input, response, str(e))
             return {
                 "status": "success_with_fallback",

@@ -62,22 +62,22 @@ services:
     networks:
       - db_net
 
-  # open-webui:
-  #   image: ghcr.io/open-webui/open-webui:main
-  #   container_name: open-webui
-  #   restart: no
-  #   ports:
-  #     - "8383:8080"
-  #   environment:
-  #     - DEFAULT_USER=admin@gmail.com
-  #     - DEFAULT_PASSWORD=221232
-  #     - OLLAMA_BASE_URL=http://ollama:11434
-  #   volumes:
-  #     - open-webui-data:/app/backend/data
-  #   networks:
-  #     - db_net
-  #   depends_on:
-  #     - ollama
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: no
+    ports:
+      - "8383:8080"
+    environment:
+      - DEFAULT_USER=admin@gmail.com
+      - DEFAULT_PASSWORD=221232
+      - OLLAMA_BASE_URL=http://ollama:11434
+    volumes:
+      - open-webui-data:/app/backend/data
+    networks:
+      - db_net
+    depends_on:
+      - ollama
 
   # app:
   #   container_name: devs-ai

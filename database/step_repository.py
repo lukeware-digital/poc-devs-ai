@@ -5,7 +5,7 @@ from uuid import UUID
 
 from database.connection import DatabaseConnection
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class StepRepository:

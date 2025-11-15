@@ -12,7 +12,7 @@ from services.job_manager import JobManager
 from services.project_analyzer import ProjectAnalyzer
 from utils.git_utils import ensure_temp_directory
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class JobProcessor:

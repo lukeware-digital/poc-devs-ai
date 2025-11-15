@@ -7,7 +7,7 @@ import logging
 
 import chromadb
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class RAGRetriever:

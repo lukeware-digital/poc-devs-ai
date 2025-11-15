@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class BaseEmbedder(ABC):

@@ -92,7 +92,7 @@ def load_configuration(config_path: str = None) -> dict:
         if config_path and config_file != _DEFAULT_CONFIG_PATH:
             import logging
 
-            logger = logging.getLogger("DEVs_AI")
+            logger = logging.getLogger("devs-ai")
             logger.warning(
                 f"Arquivo de configuração não encontrado: {config_file}. Usando fallback: {_DEFAULT_CONFIG_PATH}"
             )

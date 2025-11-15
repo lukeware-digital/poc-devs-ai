@@ -3,7 +3,7 @@ import os
 
 import asyncpg
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class DatabaseConnection:

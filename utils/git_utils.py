@@ -5,7 +5,7 @@ import re
 import shutil
 from pathlib import Path
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 def sanitize_path(path: str) -> str:

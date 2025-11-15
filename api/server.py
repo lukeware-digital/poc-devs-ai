@@ -15,7 +15,7 @@ from services.job_manager import JobManager
 from services.job_processor import JobProcessor
 from utils.git_utils import create_archive
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 system: DEVsAISystem | None = None
 job_processor: JobProcessor | None = None

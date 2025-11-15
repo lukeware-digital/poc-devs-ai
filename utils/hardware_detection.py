@@ -9,7 +9,7 @@ import subprocess
 from dataclasses import dataclass
 from enum import Enum
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
 
 class HardwareTier(Enum):

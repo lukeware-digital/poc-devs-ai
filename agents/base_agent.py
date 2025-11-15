@@ -4,8 +4,9 @@ from datetime import datetime
 
 from config.logging_config import AgentAdapter
 
-logger = logging.getLogger("DEVs_AI")
+logger = logging.getLogger("devs-ai")
 
+BORDER = "═" * 80
 
 class BaseAgent:
     """
@@ -22,7 +23,7 @@ class BaseAgent:
         guardrails: any,
     ):
         self.agent_id = agent_id
-        self.llm = llm_layer
+        self.llm_layer = llm_layer
         self.shared_context = shared_context
         self.rag = rag_retriever
         self.guardrails = guardrails
@@ -34,6 +35,7 @@ class BaseAgent:
         }
         self._prompt_loader = None
         self._logger = AgentAdapter(logger, {"agent_id": agent_id})
+        self._llm_initialized = False
 
     async def execute(self, task: dict[str, any]) -> dict[str, any]:
         """
@@ -46,6 +48,11 @@ class BaseAgent:
         self._logger.debug(f"Detalhes da tarefa: {self._sanitize_task_for_log(task)}")
 
         try:
+            if not self._llm_initialized:
+                self.llm = self.llm_layer
+                self._llm_initialized = True
+                self._logger.info(f"LLM inicializado para {self.agent_id}")
+
             self._logger.debug("Verificando permissões...")
             allowed, reason = await self.guardrails.check_permission(self.agent_id, operation, task.get("context", {}))
             if not allowed:
@@ -65,6 +72,8 @@ class BaseAgent:
             self._log_agent_status("concluido_sucesso", f"Tarefa concluída com sucesso em {execution_time:.2f}s")
             self._logger.debug(f"Resultado: {self._sanitize_result_for_log(result)}")
 
+            await self._cleanup_llm()
+
             return result
 
         except Exception as e:
@@ -74,6 +83,8 @@ class BaseAgent:
             error_trace = traceback.format_exc()
             self._log_agent_status("concluido_erro", f"Erro após {execution_time:.2f}s: {str(e)}")
             self._logger.debug(f"Stack trace: {error_trace}")
+
+            await self._cleanup_llm()
 
             raise
 
@@ -108,6 +119,11 @@ class BaseAgent:
         """
         Helper method para gerar resposta LLM com agent_id automaticamente.
         """
+        if not self._llm_initialized:
+            self.llm = self.llm_layer
+            self._llm_initialized = True
+            self._logger.info(f"LLM inicializado para {self.agent_id}")
+
         return await self.llm.generate_response(
             prompt=prompt,
             temperature=temperature,
@@ -115,6 +131,15 @@ class BaseAgent:
             stop_sequences=stop_sequences,
             agent_id=self.agent_id,
         )
+
+    async def _cleanup_llm(self):
+        """Para a instância Ollama do LLM usado pelo agente"""
+        try:
+            if self._llm_initialized and hasattr(self, "llm") and hasattr(self.llm, "stop_agent_providers"):
+                await self.llm.stop_agent_providers(self.agent_id)
+                self._logger.info(f"LLM do agente {self.agent_id} parado com sucesso")
+        except Exception as e:
+            self._logger.warning(f"Erro ao parar LLM do agente {self.agent_id}: {str(e)}")
 
     def get_metrics(self) -> dict[str, any]:
         """
@@ -188,16 +213,15 @@ class BaseAgent:
         icon = icons.get(status, "📋")
         status_text = status_texts.get(status, status.upper())
 
-        border = "═" * 70
         agent_name = self.agent_id.replace("_", " ").title()
 
         log_message = f"""
-{border}
-{icon}  {status_text} - {agent_name}
-{border}
-{message}
-{border}
-"""
+        {BORDER}
+        {icon}  {status_text} - {agent_name}
+        {BORDER}
+        {message}
+        {BORDER}
+        """
 
         if status in ["concluido_sucesso"]:
             self._logger.info(log_message)

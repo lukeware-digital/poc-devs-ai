@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 from agents.base_agent import BaseAgent
-from utils.json_parser import extract_json_from_response
+from utils.markdown_parser import extract_structured_data_from_markdown
 
 logger = logging.getLogger("devs-ai")
 
@@ -277,34 +277,41 @@ Gere a versão corrigida seguindo:
 3. Mantenha a funcionalidade existente
 4. Melhore a qualidade sem quebrar funcionalidades
 
-RESPOSTA EM JSON (mesmo formato da implementação original):
-{{
-    "task_id": "{task_id}",
-    "files_created_modified": [
-        {{
-            "file_path": "src/main.py",
-            "content": "código corrigido aqui",
-            "action": "modify",
-            "description": "Correções aplicadas baseadas na revisão"
-        }}
-    ],
-    "corrections_applied": [
-        {{
-            "issue_description": "Descrição do issue corrigido",
-            "correction_description": "Como foi corrigido",
-            "file_affected": "src/main.py"
-        }}
-    ],
-    "improvements_made": [
-        "Lista de melhorias aplicadas"
-    ]
-}}
+RESPOSTA EM MARKDOWN (mesmo formato da implementação original):
+
+## Task ID
+{task_id}
+
+## Files Created/Modified
+
+### src/main.py
+**File Path:** src/main.py
+**Action:** modify
+**Description:** Correções aplicadas baseadas na revisão
+**Content:**
+```python
+código corrigido aqui
+```
+
+---
+
+## Corrections Applied
+
+### Correction 1
+**Issue Description:** Descrição do issue corrigido
+**Correction Description:** Como foi corrigido
+**File Affected:** src/main.py
+
+---
+
+## Improvements Made
+- Lista de melhorias aplicadas
 """
 
         response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
-            correction = extract_json_from_response(response, model_name=self.agent_id)
+            correction = extract_structured_data_from_markdown(response, model_name=self.agent_id)
 
             # Aplica as correções
             await self._apply_code_changes(correction)
@@ -342,47 +349,83 @@ Gere a seguinte documentação:
 6. Documentação de arquitetura
 7. Troubleshooting comum
 
-FORMATO JSON:
-{{
-    "readme_main": {{
-        "file_path": "README.md",
-        "content": "# Conteúdo completo do README"
-    }},
-    "installation_guide": {{
-        "file_path": "docs/INSTALLATION.md",
-        "content": "Guia de instalação"
-    }},
-    "development_guide": {{
-        "file_path": "docs/DEVELOPMENT.md",
-        "content": "Guia para desenvolvedores"
-    }},
-    "api_documentation": {{
-        "file_path": "docs/API.md",
-        "content": "Documentação da API"
-    }},
-    "deployment_guide": {{
-        "file_path": "docs/DEPLOYMENT.md",
-        "content": "Guia de deploy"
-    }},
-    "architecture_documentation": {{
-        "file_path": "docs/ARCHITECTURE.md",
-        "content": "Documentação arquitetural"
-    }},
-    "troubleshooting_guide": {{
-        "file_path": "docs/TROUBLESHOOTING.md",
-        "content": "Guia de troubleshooting"
-    }},
-    "code_comments_summary": {{
-        "file_path": "docs/CODE_OVERVIEW.md",
-        "content": "Visão geral do código"
-    }}
-}}
+FORMATO MARKDOWN:
+
+## Readme Main
+**File Path:** README.md
+**Content:**
+```
+# Conteúdo completo do README
+```
+
+---
+
+## Installation Guide
+**File Path:** docs/INSTALLATION.md
+**Content:**
+```
+Guia de instalação
+```
+
+---
+
+## Development Guide
+**File Path:** docs/DEVELOPMENT.md
+**Content:**
+```
+Guia para desenvolvedores
+```
+
+---
+
+## API Documentation
+**File Path:** docs/API.md
+**Content:**
+```
+Documentação da API
+```
+
+---
+
+## Deployment Guide
+**File Path:** docs/DEPLOYMENT.md
+**Content:**
+```
+Guia de deploy
+```
+
+---
+
+## Architecture Documentation
+**File Path:** docs/ARCHITECTURE.md
+**Content:**
+```
+Documentação arquitetural
+```
+
+---
+
+## Troubleshooting Guide
+**File Path:** docs/TROUBLESHOOTING.md
+**Content:**
+```
+Guia de troubleshooting
+```
+
+---
+
+## Code Comments Summary
+**File Path:** docs/CODE_OVERVIEW.md
+**Content:**
+```
+Visão geral do código
+```
 """
 
         response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
-            documentation = extract_json_from_response(response, model_name=self.agent_id)
+            documentation = extract_structured_data_from_markdown(response, model_name=self.agent_id)
             # Cria os arquivos de documentação
             for _doc_type, doc_info in documentation.items():
                 if isinstance(doc_info, dict) and "file_path" in doc_info:

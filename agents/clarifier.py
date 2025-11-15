@@ -4,7 +4,7 @@ import logging
 
 from agents.base_agent import BaseAgent
 from models.task_specification import TaskSpecification
-from utils.json_parser import JSONParseError, extract_json_from_response
+from utils.markdown_parser import MarkdownParseError, extract_structured_data_from_markdown
 
 logger = logging.getLogger("devs-ai")
 
@@ -22,31 +22,44 @@ class Agent1_Clarificador(BaseAgent):
         template_base = self._build_prompt("clarifier", {})
 
         prompt = f"""
-{template_base}
+            {template_base}
 
-Analise a seguinte solicitação do usuário:
-SOLICITAÇÃO: {user_input}
-CONTEXTO RELEVANTE:
-{json.dumps(rag_context, indent=2)}
+            Analise a seguinte solicitação do usuário:
+            SOLICITAÇÃO: {user_input}
+            CONTEXTO RELEVANTE:
+            {json.dumps(rag_context, indent=2)}
 
-Sua tarefa é:
-1. Clarificar requisitos ambíguos
-2. Identificar requisitos funcionais e não-funcionais
-3. Definir critérios de aceitação claros
-4. Estimar complexidade (1-10)
+            Sua tarefa é:
+            1. Clarificar requisitos ambíguos
+            2. Identificar requisitos funcionais e não-funcionais
+            3. Definir critérios de aceitação claros
+            4. Estimar complexidade (1-10)
 
-Responda em formato JSON estruturado:
-{{
-    "requirements_breakdown": {{
-        "functional": [],
-        "non_functional": []
-    }},
-    "acceptance_criteria": [],
-    "clarification_questions": [],
-    "estimated_complexity": 0,
-    "technical_considerations": []
-}}
-"""
+            Responda em formato Markdown estruturado:
+
+            ## Requirements Breakdown
+
+            ### Functional
+            - [Lista de requisitos funcionais, um por linha]
+
+            ### Non-Functional
+            - [Lista de requisitos não-funcionais, um por linha]
+
+            ## Acceptance Criteria
+            - [Critério de aceitação 1]
+            - [Critério de aceitação 2]
+
+            ## Clarification Questions
+            - [Pergunta de clarificação 1]
+            - [Pergunta de clarificação 2]
+
+            ## Estimated Complexity
+            [Número de 1 a 10]
+
+            ## Technical Considerations
+            - [Consideração técnica 1]
+            - [Consideração técnica 2]
+        """
 
         # Obtém temperatura do config para este agente (com valor padrão)
         agent_config = getattr(self.shared_context, "config", {})
@@ -67,7 +80,25 @@ Responda em formato JSON estruturado:
         logger.debug(f"Resposta recebida (tamanho: {len(response) if response else 0} caracteres)")
 
         try:
-            spec = extract_json_from_response(response, model_name=model_name)
+            spec = extract_structured_data_from_markdown(response, model_name=model_name)
+            requirements_breakdown = spec.get("requirements_breakdown")
+            if requirements_breakdown is None:
+                requirements_breakdown = {"functional": [], "non_functional": []}
+            elif not isinstance(requirements_breakdown, dict):
+                requirements_breakdown = {"functional": [], "non_functional": []}
+            
+            estimated_complexity = spec.get("estimated_complexity", 5)
+            if isinstance(estimated_complexity, list) and len(estimated_complexity) > 0:
+                estimated_complexity = estimated_complexity[0]
+            if isinstance(estimated_complexity, str):
+                estimated_complexity = estimated_complexity.strip().strip("[]")
+                try:
+                    estimated_complexity = int(estimated_complexity)
+                except (ValueError, TypeError):
+                    estimated_complexity = 5
+            if not isinstance(estimated_complexity, int):
+                estimated_complexity = 5
+            
             task_spec = TaskSpecification(
                 task_id=task.get(
                     "task_id",
@@ -75,9 +106,9 @@ Responda em formato JSON estruturado:
                 ),
                 description=user_input,
                 acceptance_criteria=spec.get("acceptance_criteria", []),
-                estimated_complexity=spec.get("estimated_complexity", 5),
+                estimated_complexity=estimated_complexity,
                 technical_constraints=spec.get("technical_considerations", []),
-                requirements_breakdown=spec.get("requirements_breakdown"),
+                requirements_breakdown=requirements_breakdown,
                 clarification_questions=spec.get("clarification_questions", []),
             )
 
@@ -128,8 +159,8 @@ Responda em formato JSON estruturado:
                 "specification": task_spec.model_dump(),
                 "clarification_questions": spec.get("clarification_questions", []),
             }
-        except JSONParseError as e:
-            logger.error(f"Erro detalhado no parsing JSON: {str(e)}")
+        except MarkdownParseError as e:
+            logger.error(f"Erro detalhado no parsing Markdown: {str(e)}")
             corrected_spec = self._fallback_spec_creation(user_input, response, str(e))
             return {
                 "status": "success_with_fallback",

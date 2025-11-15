@@ -3,7 +3,7 @@ import logging
 import os
 
 from agents.base_agent import BaseAgent
-from utils.json_parser import extract_json_from_response
+from utils.markdown_parser import extract_structured_data_from_markdown
 
 logger = logging.getLogger("devs-ai")
 
@@ -80,45 +80,69 @@ Suas responsabilidades:
 5. Documentação inicial do projeto
 6. Scripts de inicialização
 
-ESTRUTURA ESPERADA (formato JSON):
-{{
-    "project_structure": [
-        {{
-            "type": "directory|file",
-            "path": "src/models/",
-            "name": "__init__.py",
-            "content": "# File content or null for directories",
-            "template_type": "python_package|config_file|readme|dockerfile",
-            "permissions": "644|755",
-            "description": "Purpose of this file/directory"
-        }}
-    ],
-    "configuration_files": [
-        {{
-            "file_path": "requirements.txt",
-            "content": "fastapi\\nuvicorn\\nsqlalchemy",
-            "description": "Python dependencies"
-        }}
-    ],
-    "setup_scripts": [
-        {{
-            "name": "setup.sh",
-            "content": "#!/bin/bash\\n pip install -r requirements.txt",
-            "description": "Initial setup script"
-        }}
-    ],
-    "development_tools": {{
-        "linter_config": {{}},
-        "formatter_config": {{}},
-        "test_runner_config": {{}},
-        "build_tools": []
-    }},
-    "documentation": {{
-        "readme_content": "# Project Name\\n## Description",
-        "api_docs_structure": [],
-        "deployment_guide": ""
-    }}
-}}
+ESTRUTURA ESPERADA (formato Markdown):
+
+## Project Structure
+
+### Item 1
+**Type:** directory|file
+**Path:** src/models/
+**Name:** __init__.py
+**Content:**
+```
+# File content or null for directories
+```
+**Template Type:** python_package|config_file|readme|dockerfile
+**Permissions:** 644|755
+**Description:** Purpose of this file/directory
+
+---
+
+## Configuration Files
+
+### requirements.txt
+**File Path:** requirements.txt
+**Content:**
+```
+fastapi
+uvicorn
+sqlalchemy
+```
+**Description:** Python dependencies
+
+---
+
+## Setup Scripts
+
+### setup.sh
+**Name:** setup.sh
+**Content:**
+```bash
+#!/bin/bash
+pip install -r requirements.txt
+```
+**Description:** Initial setup script
+
+---
+
+## Development Tools
+**Linter Config:** [configuração]
+**Formatter Config:** [configuração]
+**Test Runner Config:** [configuração]
+**Build Tools:**
+- [ferramenta 1]
+
+## Documentation
+**Readme Content:**
+```
+# Project Name
+## Description
+```
+**API Docs Structure:**
+- [estrutura 1]
+
+**Deployment Guide:**
+[guia de deploy]
 """
 
         # Obtém temperatura do config para este agente
@@ -128,7 +152,7 @@ ESTRUTURA ESPERADA (formato JSON):
         response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
-            project_structure = extract_json_from_response(response, model_name=self.agent_id)
+            project_structure = extract_structured_data_from_markdown(response, model_name=self.agent_id)
 
             # Cria estrutura real no sistema de arquivos
             created_files = await self._create_project_structure(project_structure, capability_token)

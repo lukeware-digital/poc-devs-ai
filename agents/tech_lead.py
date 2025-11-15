@@ -2,7 +2,7 @@ import json
 import logging
 
 from agents.base_agent import BaseAgent
-from utils.json_parser import extract_json_from_response
+from utils.markdown_parser import extract_structured_data_from_markdown
 
 logger = logging.getLogger("devs-ai")
 
@@ -68,55 +68,79 @@ Suas responsabilidades:
 5. Especificar critérios de qualidade para cada task
 6. Identificar riscos técnicos e mitigações
 
-Formato JSON:
-{{
-    "technical_tasks": [
-        {{
-            "task_id": "TECH-1",
-            "description": "Implementar modelo de dados para Task",
-            "type": "backend|frontend|database|infra|test",
-            "complexity": "low|medium|high",
-            "estimated_hours": 0,
-            "dependencies": [],
-            "acceptance_criteria": [],
-            "technology_specifics": {{
-                "libraries": [],
-                "frameworks": [],
-                "tools": []
-            }},
-            "quality_requirements": {{
-                "test_coverage": 0,
-                "performance_targets": [],
-                "security_requirements": []
-            }},
-            "risk_assessment": {{
-                "level": "low|medium|high",
-                "mitigation_strategy": ""
-            }}
-        }}
-    ],
-    "technology_stack_detailed": {{
-        "backend": [],
-        "frontend": [],
-        "database": [],
-        "infrastructure": [],
-        "devops": []
-    }},
-    "development_workflow": {{
-        "branch_strategy": "git-flow|trunk-based",
-        "code_review_process": [],
-        "testing_strategy": [],
-        "deployment_process": []
-    }},
-    "technical_risks": [
-        {{
-            "risk": "",
-            "probability": "low|medium|high",
-            "impact": "low|medium|high",
-            "mitigation": ""
-        }}
-    ]
-}}
+Formato Markdown:
+
+## Technical Tasks
+
+### TECH-1
+**Description:** Implementar modelo de dados para Task
+**Type:** backend|frontend|database|infra|test
+**Complexity:** low|medium|high
+**Estimated Hours:** [número]
+**Dependencies:**
+- [dependência 1]
+
+**Acceptance Criteria:**
+- [critério 1]
+- [critério 2]
+
+**Technology Specifics:**
+**Libraries:**
+- [biblioteca 1]
+
+**Frameworks:**
+- [framework 1]
+
+**Tools:**
+- [ferramenta 1]
+
+**Quality Requirements:**
+**Test Coverage:** [porcentagem]
+**Performance Targets:**
+- [target 1]
+
+**Security Requirements:**
+- [requisito 1]
+
+**Risk Assessment:**
+**Level:** low|medium|high
+**Mitigation Strategy:** [estratégia]
+
+---
+
+## Technology Stack Detailed
+**Backend:**
+- [tecnologia 1]
+
+**Frontend:**
+- [tecnologia 1]
+
+**Database:**
+- [tecnologia 1]
+
+**Infrastructure:**
+- [tecnologia 1]
+
+**DevOps:**
+- [tecnologia 1]
+
+## Development Workflow
+**Branch Strategy:** git-flow|trunk-based
+**Code Review Process:**
+- [processo 1]
+
+**Testing Strategy:**
+- [estratégia 1]
+
+**Deployment Process:**
+- [processo 1]
+
+## Technical Risks
+
+### [Nome do Risco]
+**Probability:** low|medium|high
+**Impact:** low|medium|high
+**Mitigation:** [mitigação]
 """
 
         # Obtém temperatura do config para este agente
@@ -126,7 +150,7 @@ Formato JSON:
         response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
-            technical_plan = extract_json_from_response(response, model_name=self.agent_id)
+            technical_plan = extract_structured_data_from_markdown(response, model_name=self.agent_id)
 
             # Atualiza contexto compartilhado
             await self.shared_context.update_decision(

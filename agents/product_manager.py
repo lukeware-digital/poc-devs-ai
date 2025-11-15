@@ -2,7 +2,7 @@ import json
 import logging
 
 from agents.base_agent import BaseAgent
-from utils.json_parser import extract_json_from_response
+from utils.markdown_parser import extract_structured_data_from_markdown
 
 logger = logging.getLogger("devs-ai")
 
@@ -75,40 +75,39 @@ class Agent2_ProductManager(BaseAgent):
         - Verifique que todos os campos estão preenchidos corretamente
         - Garanta que acceptance_criteria são strings, não objetos
 
-        Formato de resposta JSON:
-        {{
-            "user_stories": [
-                {{
-                    "id": "US-1",
-                    "description": "Como [persona específica], eu quero [ação clara] para [benefício mensurável]",
-                    "acceptance_criteria": [
-                        "Critério testável 1 em formato de string",
-                        "Critério testável 2 em formato de string",
-                        "Critério testável 3 em formato de string"
-                    ],
-                    "priority": "high",
-                    "definition_of_done": [
-                        "Código implementado e revisado",
-                        "Testes unitários com cobertura > 80%",
-                        "Documentação atualizada",
-                        "Code review aprovado",
-                        "Funcionalidade testada manualmente"
-                    ],
-                    "estimated_story_points": 5
-                }}
-            ],
-            "product_backlog": [
-                "ID da história prioritária para próxima sprint"
-            ],
-            "release_planning": {{
-                "mvp_scope": [
-                    "IDs das histórias essenciais para MVP"
-                ],
-                "future_enhancements": [
-                    "IDs das histórias para versões futuras"
-                ]
-            }}
-        }}
+        Formato de resposta Markdown:
+
+        ## User Stories
+
+        ### US-1
+        **Description:** Como [persona específica], eu quero [ação clara] para [benefício mensurável]
+        **Priority:** high
+        **Estimated Story Points:** 5
+
+        **Acceptance Criteria:**
+        - Critério testável 1 em formato de string
+        - Critério testável 2 em formato de string
+        - Critério testável 3 em formato de string
+
+        **Definition of Done:**
+        - Código implementado e revisado
+        - Testes unitários com cobertura > 80%
+        - Documentação atualizada
+        - Code review aprovado
+        - Funcionalidade testada manualmente
+
+        ---
+
+        ## Product Backlog
+        - ID da história prioritária para próxima sprint
+
+        ## Release Planning
+
+        ### MVP Scope
+        - IDs das histórias essenciais para MVP
+
+        ### Future Enhancements
+        - IDs das histórias para versões futuras
 
         IMPORTANTE:
         - acceptance_criteria deve ser array de STRINGS, nunca objetos ou dicionários
@@ -124,7 +123,7 @@ class Agent2_ProductManager(BaseAgent):
         response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
-            user_stories = extract_json_from_response(response)
+            user_stories = extract_structured_data_from_markdown(response)
 
             # Atualiza contexto compartilhado
             await self.shared_context.update_decision(self.agent_id, "technical", "user_stories", user_stories, 0.9)

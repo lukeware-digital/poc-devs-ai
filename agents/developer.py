@@ -3,7 +3,7 @@ import logging
 import os
 
 from agents.base_agent import BaseAgent
-from utils.json_parser import extract_json_from_response
+from utils.markdown_parser import extract_structured_data_from_markdown
 
 logger = logging.getLogger("devs-ai")
 
@@ -116,7 +116,7 @@ class Agent6_Desenvolvedor(BaseAgent):
         response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
-            implementation = extract_json_from_response(response, model_name=self.agent_id)
+            implementation = extract_structured_data_from_markdown(response, model_name=self.agent_id)
             await self._apply_code_changes(implementation)
             return implementation
         except Exception as e:
@@ -210,31 +210,42 @@ Requisitos:
 5. Considere os critérios de aceitação
 6. Siga as convenções da linguagem/stack
 
-RESPOSTA EM JSON:
-{{
-    "task_id": "{task["task_id"]}",
-    "files_created_modified": [
-        {{
-            "file_path": "src/main.py",
-            "content": "código completo aqui",
-            "action": "create|modify",
-            "description": "Descrição das mudanças"
-        }}
-    ],
-    "dependencies_added": [],
-    "tests_suggested": [
-        {{
-            "test_file": "test_main.py",
-            "test_cases": []
-        }}
-    ],
-    "implementation_notes": "Notas sobre decisões de implementação",
-    "quality_metrics": {{
-        "complexity": "low|medium|high",
-        "maintainability": "high",
-        "security_considerations": []
-    }}
-}}
+RESPOSTA EM MARKDOWN:
+
+## Task ID
+{task["task_id"]}
+
+## Files Created/Modified
+
+### src/main.py
+**File Path:** src/main.py
+**Action:** create|modify
+**Description:** Descrição das mudanças
+**Content:**
+```python
+código completo aqui
+```
+
+---
+
+## Dependencies Added
+- [dependência 1]
+
+## Tests Suggested
+
+### test_main.py
+**Test File:** test_main.py
+**Test Cases:**
+- [caso de teste 1]
+
+## Implementation Notes
+Notas sobre decisões de implementação
+
+## Quality Metrics
+**Complexity:** low|medium|high
+**Maintainability:** high
+**Security Considerations:**
+- [consideração 1]
 """
 
     async def _apply_code_changes(self, implementation: dict[str, any]):

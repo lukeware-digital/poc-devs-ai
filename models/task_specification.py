@@ -2,6 +2,8 @@
 Modelo Pydantic para especificação de tarefas
 """
 
+from typing import Optional
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -26,8 +28,9 @@ class TaskSpecification(BaseModel):
         default_factory=list, description="Restrições técnicas identificadas"
     )
     fallback_attempts: int = Field(default=0, ge=0, description="Número de tentativas de fallback realizadas")
-    requirements_breakdown: dict[str, list[str | None]] = Field(
-        default=None, description="Breakdown de requisitos funcionais e não-funcionais"
+    requirements_breakdown: Optional[dict[str, list[str | None]]] = Field(
+        default_factory=lambda: {"functional": [], "non_functional": []},
+        description="Breakdown de requisitos funcionais e não-funcionais",
     )
     clarification_questions: list[str | None] = Field(
         default_factory=list, description="Questões de clarificação para o usuário"

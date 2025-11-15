@@ -4,7 +4,7 @@ import logging
 import numpy as np
 
 from agents.base_agent import BaseAgent
-from utils.json_parser import extract_json_from_response
+from utils.markdown_parser import extract_structured_data_from_markdown
 
 logger = logging.getLogger("devs-ai")
 
@@ -195,57 +195,70 @@ Análise a ser realizada:
    - Acoplamento e coesão
    - Separação de responsabilidades
 
-RESPOSTA EM JSON:
-{{
-    "task_id": "{task_id}",
-    "overall_score": 0.0,
-    "approved": false,
-    "issues_found": [
-        {{
-            "type": "bug|security|performance|maintainability|style",
-            "severity": "low|medium|high|critical",
-            "file": "src/main.py",
-            "line": 10,
-            "description": "Descrição detalhada do problema",
-            "suggestion": "Sugestão de correção",
-            "priority": "must_fix|should_fix|could_fix"
-        }}
-    ],
-    "suggested_improvements": [
-        {{
-            "type": "refactor|optimize|enhance",
-            "description": "Descrição da melhoria",
-            "benefit": "Benefício esperado",
-            "effort": "low|medium|high"
-        }}
-    ],
-    "positive_feedback": [
-        "Aspectos bem implementados"
-    ],
-    "test_recommendations": [
-        {{
-            "test_type": "unit|integration|e2e",
-            "scope": "O que testar",
-            "priority": "high|medium|low"
-        }}
-    ],
-    "security_assessment": {{
-        "vulnerabilities_found": [],
-        "data_handling": "secure|needs_improvement",
-        "authentication_authorization": "adequate|insufficient"
-    }},
-    "performance_assessment": {{
-        "efficiency": "efficient|moderate|inefficient",
-        "bottlenecks_identified": [],
-        "optimization_suggestions": []
-    }}
-}}
+RESPOSTA EM MARKDOWN:
+
+## Task ID
+{task_id}
+
+## Overall Score
+[0.0 a 10.0]
+
+## Approved
+true|false
+
+## Issues Found
+
+### Issue 1
+**Type:** bug|security|performance|maintainability|style
+**Severity:** low|medium|high|critical
+**File:** src/main.py
+**Line:** 10
+**Description:** Descrição detalhada do problema
+**Suggestion:** Sugestão de correção
+**Priority:** must_fix|should_fix|could_fix
+
+---
+
+## Suggested Improvements
+
+### Improvement 1
+**Type:** refactor|optimize|enhance
+**Description:** Descrição da melhoria
+**Benefit:** Benefício esperado
+**Effort:** low|medium|high
+
+---
+
+## Positive Feedback
+- Aspectos bem implementados
+
+## Test Recommendations
+
+### Recommendation 1
+**Test Type:** unit|integration|e2e
+**Scope:** O que testar
+**Priority:** high|medium|low
+
+## Security Assessment
+**Vulnerabilities Found:**
+- [vulnerabilidade 1]
+
+**Data Handling:** secure|needs_improvement
+**Authentication Authorization:** adequate|insufficient
+
+## Performance Assessment
+**Efficiency:** efficient|moderate|inefficient
+**Bottlenecks Identified:**
+- [gargalo 1]
+
+**Optimization Suggestions:**
+- [sugestão 1]
 """
 
         response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
-            review = extract_json_from_response(response, model_name=self.agent_id)
+            review = extract_structured_data_from_markdown(response, model_name=self.agent_id)
             return review
         except Exception as e:
             logger.error(f"Erro no parsing da revisão para task {task_id}: {str(e)}")

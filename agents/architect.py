@@ -2,7 +2,7 @@ import json
 import logging
 
 from agents.base_agent import BaseAgent
-from utils.json_parser import extract_json_from_response
+from utils.markdown_parser import extract_structured_data_from_markdown
 
 logger = logging.getLogger("devs-ai")
 
@@ -37,35 +37,52 @@ Defina:
 5. Considerações de escalabilidade, segurança e manutenção
 6. Diagrama de componentes em texto (para PlantUML)
 
-Formato JSON:
-{{
-    "architecture_decision": {{
-        "pattern": "",
-        "rationale": "",
-        "alternatives_considered": []
-    }},
-    "components": [
-        {{
-            "name": "",
-            "responsibility": "",
-            "technology": "",
-            "dependencies": []
-        }}
-    ],
-    "technology_stack": {{
-        "frontend": [],
-        "backend": [],
-        "database": [],
-        "infrastructure": []
-    }},
-    "communication_protocols": [],
-    "quality_attributes": {{
-        "scalability": "",
-        "security": "",
-        "maintainability": ""
-    }},
-    "plantuml_diagram": ""
-}}
+Formato Markdown:
+
+## Architecture Decision
+**Pattern:** [padrão arquitetural]
+**Rationale:** [justificativa]
+**Alternatives Considered:**
+- [alternativa 1]
+- [alternativa 2]
+
+## Components
+
+### [Nome do Componente]
+**Responsibility:** [responsabilidade]
+**Technology:** [tecnologia]
+**Dependencies:**
+- [dependência 1]
+- [dependência 2]
+
+## Technology Stack
+**Frontend:**
+- [tecnologia 1]
+- [tecnologia 2]
+
+**Backend:**
+- [tecnologia 1]
+- [tecnologia 2]
+
+**Database:**
+- [tecnologia 1]
+
+**Infrastructure:**
+- [tecnologia 1]
+
+## Communication Protocols
+- [protocolo 1]
+- [protocolo 2]
+
+## Quality Attributes
+**Scalability:** [descrição]
+**Security:** [descrição]
+**Maintainability:** [descrição]
+
+## PlantUML Diagram
+```
+[código do diagrama PlantUML aqui]
+```
 """
 
         # Obtém temperatura do config para este agente
@@ -75,7 +92,7 @@ Formato JSON:
         response = await self._generate_llm_response(prompt, temperature=temperature)
 
         try:
-            architecture = extract_json_from_response(response, model_name=self.agent_id)
+            architecture = extract_structured_data_from_markdown(response, model_name=self.agent_id)
 
             # Atualiza contexto compartilhado
             await self.shared_context.update_decision(

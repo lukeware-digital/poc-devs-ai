@@ -112,10 +112,10 @@ print("Grafo salvo como graph.png")
 # 14- Executando o graph
 if __name__ == "__main__":
     exemplos = [
-        # "Quanto é 2+2?",
-        # "Quem descobriu a América em uma frase?",
-        # "O que é a vida em uma frase?",
-        # "Me diga um comando especial?",
+        "Quanto é 2+2?",
+        "Quem descobriu a América em uma frase?",
+        "O que é a vida em uma frase?",
+        "Me diga um comando especial?",
         "Pesquise sobre, quanto foi criado o DeepSeek?",
     ]
     # Gerar visualização do graph

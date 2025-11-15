@@ -1,0 +1,136 @@
+services:
+  # redis-stack:
+  #   container_name: redis-stack
+  #   image: redis/redis-stack:latest
+  #   restart: no
+  #   ports:
+  #     - "8001:8001"
+  #     - "6379:6379"
+  #   networks:
+  #     - db_net
+
+  # chromadb:
+  #   container_name: chromadb
+  #   image: chromadb/chroma:0.6.3
+  #   restart: no
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - IS_PERSISTENT=true
+  #     - ANONYMIZED_TELEMETRY=false
+  #   volumes:
+  #     - chroma_data:/chroma/chroma
+  #   networks:
+  #     - db_net
+
+  # postgres:
+  #   container_name: postgres
+  #   image: postgres:alpine
+  #   restart: no
+  #   environment:
+  #     POSTGRES_DB: minha_base
+  #     POSTGRES_USER: usuario
+  #     POSTGRES_PASSWORD: senha
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - db_net
+
+  # postgres-web:
+  #   container_name: postgres-web
+  #   image: sosedoff/pgweb:latest
+  #   restart: no
+  #   ports:
+  #     - "8081:8081"
+  #   environment:
+  #     - DATABASE_URL=postgresql://usuario:senha@postgres:5432/minha_base?sslmode=disable
+  #   networks:
+  #     - db_net
+  #   depends_on:
+  #     - postgres
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: no
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - db_net
+    environment:
+      - OLLAMA_NUM_PARALLEL=4
+      - OLLAMA_MAX_LOADED_MODELS=2
+      - OLLAMA_NUM_GPU=0
+      - OLLAMA_HOST=0.0.0.0:11434
+    deploy:
+      resources:
+        limits:
+          memory: 24G
+        reservations:
+          memory: 16G
+    shm_size: 8gb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # open-webui:
+  #   image: ghcr.io/open-webui/open-webui:main
+  #   container_name: open-webui
+  #   restart: no
+  #   ports:
+  #     - "8383:8080"
+  #   environment:
+  #     - DEFAULT_USER=admin@gmail.com
+  #     - DEFAULT_PASSWORD=221232
+  #     - OLLAMA_BASE_URL=http://ollama:11434
+  #   volumes:
+  #     - open-webui-data:/app/backend/data
+  #   networks:
+  #     - db_net
+  #   depends_on:
+  #     - ollama
+
+  # app:
+  #   container_name: devs-ai
+  #   build: .
+  #   ports:
+  #     - "8181:8181"
+  #   volumes:
+  #     - chroma_data:/app/chroma_data
+  #     - logs:/app/logs
+  #   environment:
+  #     - PORT=8181
+  #     - CHROMA_DB_HOST=chromadb
+  #     - CHROMA_DB_PORT=8000
+  #     - POSTGRES_DB=minha_base
+  #     - POSTGRES_USER=usuario
+  #     - POSTGRES_PASSWORD=senha
+  #     - POSTGRES_HOST=postgres
+  #     - REDIS_HOST=redis-stack
+  #     - REDIS_PORT=6379
+  #   networks:
+  #     - db_net
+  #   depends_on:
+  #     - chromadb
+  #     - postgres
+  #     - redis-stack
+  #   restart: no
+
+volumes:
+  open-webui-data:
+  ollama_data:
+  postgres_data:
+  chroma_data:
+  redisinsight_data:
+  logs:
+
+networks:
+  db_net:
+    name: db_net

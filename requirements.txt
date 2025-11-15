@@ -1,0 +1,9 @@
+langgraph>=1.0.3
+langchain-community>=0.4.1
+langchain>=1.0.7
+langchain-ollama>=1.0.0
+python-dotenv>=1.2.1
+ipykernel>=7.1.0
+ddgs>=9.9.1
+# Dev
+ruff>=0.14.5
